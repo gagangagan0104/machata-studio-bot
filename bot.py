@@ -1,15 +1,18 @@
 import os
 import logging
+from aiohttp import web
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from aiogram.fsm.storage.memory import MemoryStorage
+import asyncio
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
 
 # Токен бота из переменных окружения
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+PORT = int(os.getenv("PORT", 10000))
 
 bot = Bot(token=BOT_TOKEN)
 storage = MemoryStorage()
@@ -73,10 +76,28 @@ async def book_rehearsal(message: types.Message):
         reply_markup=main_menu()
     )
 
-# Запуск бота
+# Healthcheck endpoint для Render
+async def healthcheck(request):
+    return web.Response(text="OK")
+
+# Запуск бота и веб-сервера
 async def main():
+    # Создаём веб-приложение для healthcheck
+    app = web.Application()
+    app.router.add_get("/", healthcheck)
+    app.router.add_get("/health", healthcheck)
+    
+    # Запускаем веб-сервер и бота параллельно
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", PORT)
+    await site.start()
+    
+    logging.info(f"Web server started on port {PORT}")
+    logging.info("Bot started")
+    
+    # Запускаем polling бота
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    import asyncio
     asyncio.run(main())
