@@ -192,7 +192,7 @@ async def process_time_selection(callback: types.CallbackQuery, state: FSMContex
                 f"📅 {date_formatted}\n"
                 f"⏱️ {selected_time}\n\n"
                 f"💵 Стоимость: 700₽\n"
-               f"🐳 Предоплата: 350₽ (50%)\n\n"
+           ✅  f"🐳 Предоплата: 350₽ (50%)\n\n"
                 f"📞 Контакт администратора: [укажите контакт]",
                 reply_markup=keyboard    )
     await state.set_state(BookingStates.confirming)
