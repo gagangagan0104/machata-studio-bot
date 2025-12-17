@@ -237,7 +237,6 @@ async def back_to_calendar(callback: types.CallbackQuery, state: FSMContext):
         "Выберите дату репетиции:",
         reply_markup=generate_calendar_keyboard()
     )
-    await state.set_state(BookingStates.choosing_date)
     await callback.answer()
 
 # Обработка занятых слотов
@@ -255,18 +254,24 @@ async def main():
     app = web.Application()
     app.router.add_get("/", healthcheck)
     app.router.add_get("/health", healthcheck)
-
-    # Запускаем веб-сервер и бота параллельно
+    
+    # Запускаем веб-сервер
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", PORT)
     await site.start()
+    
     logging.info(f"Web server started on port {PORT}")
     logging.info("Bot started")
-
-    # Запускаем polling бота
+    
+    # Очищаем webhook и запускаем polling
     await bot.delete_webhook(drop_pending_updates=True)
-    await dp.start_polling(bot)
-
+    
+    # Запускаем polling в фоне БЕЗ await, чтобы не блокировать
+    asyncio.create_task(dp.start_polling(bot))
+    
+    # Держим сервис живым
+    while True:
+        await asyncio.sleep(3600)  # Проверяем каждый час
 if __name__ == "__main__":
     asyncio.run(main())
