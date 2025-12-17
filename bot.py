@@ -106,12 +106,9 @@ def generate_time_keyboard(selected_date):
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     await message.answer(
-        "Привет! Это Machata studio bot.
-"
-        "Здесь можно забронировать репетицию и узнать правила студии.
-
-"
-        "Выберите действие:",
+        "Привет! Это Machata studio bot.\n"
+            "Здесь можно забронировать репетицию и узнать правила студии.\n\n"
+            "Выберите действие:",
         reply_markup=main_menu()
     )
 
