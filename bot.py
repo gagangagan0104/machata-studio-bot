@@ -188,7 +188,8 @@ async def process_time_selection(callback: types.CallbackQuery, state: FSMContex
     ])
     
     await callback.message.edit_text(
-            f"Подтвердите бронирование:\n\n"                f"📅 {date_formatted}\n"
+        ff🔍 Подтвердите бронирование:\n\n"
+                f"📅 {date_formatted}\n"
                 f"⏱️ {selected_time}\n\n"
                 f"💵 Стоимость: 700₽\n"
            ✅  f"🐳 Предоплата: 350₽ (50%)\n\n"
@@ -250,8 +251,7 @@ async def healthcheck(request):
     return web.Response(text="OK")
 
 # Запуск бота и веб-сервера
-191
-():
+async def main():
     # Создаём веб-приложение для healthcheck
     app = web.Application()
     app.router.add_get("/", healthcheck)
