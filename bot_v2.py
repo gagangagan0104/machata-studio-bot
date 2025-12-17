@@ -15,7 +15,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Конфигурация
-TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
+TOKEN = os.environ.get('BOT_TOKEN')
 YOOKASSA_SHOP_ID = os.environ.get('YOOKASSA_SHOP_ID')
 YOOKASSA_SECRET_KEY = os.environ.get('YOOKASSA_SECRET_KEY')
 ADMIN_CHAT_ID = os.environ.get('ADMIN_CHAT_ID')
