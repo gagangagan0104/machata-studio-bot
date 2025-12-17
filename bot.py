@@ -106,9 +106,11 @@ def generate_time_keyboard(selected_date):
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     await message.answer(
-        "Привет! Это Machata studio bot.\\n"
-        "Здесь можно забронировать репетицию и узнать правила студии.\\n\\n"
-        "Выберите действие:",
+        "🎵 Добро пожаловать в Machata Studio!\n\n"
+            "🎛 Профессиональная студия репетиций\n"
+            "📍 Бронируйте удобное время онлайн\n"
+            "💰 Прозрачные цены и правила\n\n"
+            "Выберите действие:"
         reply_markup=main_menu()
     )
 
@@ -116,36 +118,37 @@ async def cmd_start(message: types.Message):
 @dp.message(lambda message: message.text == "💰 Цены")
 async def show_prices(message: types.Message):
     await message.answer(
-        "Machata studio — почасовая аренда репетиционной комнаты.\\n\\n"
-        "Стоимость:\\n"
-        "▪️ 1 час — 700₽\\n"
-        "▪️ 2 часа — 1200₽\\n\\n"
-        "Предоплата — 50% от суммы.\\n"
-        "Остаток оплачивается в студии после репетиции.",
-        reply_markup=main_menu()
-    )
-
+        "💰 ЦЕНЫ НА РЕПЕТИЦИИ\n\n"
+            "⏱ 1 час — 700₽\n"
+            "⏱ 2 часа — 1200₽\n\n"
+            "🎁 Предоплата 50% от стоимости\n"
+            "✅ Остаток оплачивается в студии после репетиции\n\n"
+            "📞 Для бронирования нажмите 📅 Забронировать"
 # Правила студии
 @dp.message(lambda message: message.text == "📋 Правила студии")
 async def show_rules(message: types.Message):
     await message.answer(
-        "Правила Machata studio:\\n\\n"
-        "▪️ Работаем круглосуточно по предварительной записи.\\n"
-        "▪️ Бронь удерживается 30 минут до внесения предоплаты, затем слот может быть освобождён.\\n"
-        "▪️ При опоздании более 15 минут время не продлевается.\\n"
-        "▪️ Бережно относитесь к оборудованию, обо всех неисправностях сообщайте администратору.\\n"
-        "▪️ Отмена за 24 часа и ранее — без штрафа, позже — предоплата не возвращается.\\n\\n"
-        "Адрес студии: [укажи свой адрес]\\n"
-        "Для связи с администратором: [укажи контакт]",
-        reply_markup=main_menu()
+        "📜 ПРАВИЛА СТУДИИ\n\n"
+            "📍 БРОНИРОВАНИЕ\n"
+            "• Репетиция закрепляется после предоплаты\n"
+            "• Забронировать можно за 30 минут до начала\n\n"
+            "⌛ ОТМЕНА\n"
+            "• Бесплатно — за 15 минут до начала\n"
+            "• Позже или неявка — предоплата не возвращается\n\n"
+            "🎸 ОБОРУДОВАНИЕ\n"
+            "• Бережно относитесь к технике\n"
+            "• За поломку — материальная ответственность\n\n"
+            "🚫 ЗАПРЕЩЕНО\n"
+            "• Курение\n"
+            "• Алкоголь и психотропные вещества\n\n"
+            "📞 Контакты: [укажите контакт]"reply_markup=main_menu()
     )
 
 # Начало бронирования
 @dp.message(lambda message: message.text == "📅 Забронировать репетицию")
 async def start_booking(message: types.Message, state: FSMContext):
     await message.answer(
-        "Выберите дату репетиции:",
-        reply_markup=generate_calendar_keyboard()
+            "📅 Выберите дату репетиции:",
     )
     await state.set_state(BookingStates.choosing_date)
 
@@ -159,8 +162,8 @@ async def process_date_selection(callback: types.CallbackQuery, state: FSMContex
     date_formatted = date_obj.strftime("%d.%m.%Y")
     
     await callback.message.edit_text(
-        f"Выбрана дата: {date_formatted}\\n\\nВыберите время:\\n"
-        f"✅ — свободно | ❌ — занято",
+            f"📅 Выбрана дата: {date_formatted}\n\n⏱️ Выберите удобное время:\n"
+            f"✅ — свободно | ❌ — занято",
         reply_markup=generate_time_keyboard(selected_date)
     )
     await state.set_state(BookingStates.choosing_time)
@@ -186,13 +189,13 @@ async def process_time_selection(callback: types.CallbackQuery, state: FSMContex
     
     await callback.message.edit_text(
         f"Подтвердите бронирование:\\n\\n"
-        f"📅 Дата: {date_formatted}\\n"
-        f"🕐 Время: {selected_time}\\n"
-        f"💰 Стоимость: 700₽\\n"
-        f"💳 Предоплата: 350₽ (50%)\\n\\n"
-        f"Для оплаты свяжитесь с администратором: [укажи контакт]",
-        reply_markup=keyboard
-    )
+        ff"🔍 Подтвердите бронирование:\n\n"
+                f"📅 {date_formatted}\n"
+                f"⏱️ {selected_time}\n\n"
+                f"💵 Стоимость: 700₽\n"
+                f"🐳 Предоплата: 350₽ (50%)\n\n"
+                f"📞 Контакт администратора: [укажите контакт]",
+                reply_markup=keyboard    )
     await state.set_state(BookingStates.confirming)
     await callback.answer()
 
@@ -213,13 +216,13 @@ async def confirm_booking(callback: types.CallbackQuery, state: FSMContext):
     date_formatted = date_obj.strftime("%d.%m.%Y")
     
     await callback.message.edit_text(
-        f"✅ Бронирование подтверждено!\\n\\n"
-        f"📅 Дата: {date_formatted}\\n"
-        f"🕐 Время: {time}\\n\\n"
-        f"Внесите предоплату 350₽ в течение 30 минут.\\n"
-        f"После оплаты слот будет зарезервирован за вами.\\n\\n"
-        f"Контакт администратора: [укажи контакт]"
-    )
+        ff"✅ БРОНИРОВАНИЕ ПОДТВЕРЖДЕНО!\n\n"
+                f"📅 {date_formatted}\n"
+                f"⏱️ {time}\n\n"
+                f"💵 Предоплата: 350₽\n"
+                f"🐳 Внесите оплату в течение 30 минут\n\n"
+                f"👉 Слот зарезервирован за вами!\n\n"
+                f"📞 Контакт: [укажите контакт]"
     await state.clear()
     await callback.answer("Бронирование успешно создано!")
 
