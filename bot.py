@@ -106,9 +106,9 @@ def generate_time_keyboard(selected_date):
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     await message.answer(
-        "Привет! Это Machata studio bot.\n"
-            "Здесь можно забронировать репетицию и узнать правила студии.\n\n"
-            "Выберите действие:",
+        "Привет! Это Machata studio bot.\\n"
+        "Здесь можно забронировать репетицию и узнать правила студии.\\n\\n"
+        "Выберите действие:",
         reply_markup=main_menu()
     )
 
@@ -116,18 +116,11 @@ async def cmd_start(message: types.Message):
 @dp.message(lambda message: message.text == "💰 Цены")
 async def show_prices(message: types.Message):
     await message.answer(
-        "Machata studio — почасовая аренда репетиционной комнаты.
-
-"
-        "Стоимость:
-"
-        "▪️ 1 час — 700₽
-"
-        "▪️ 2 часа — 1200₽
-
-"
-        "Предоплата — 50% от суммы.
-"
+        "Machata studio — почасовая аренда репетиционной комнаты.\\n\\n"
+        "Стоимость:\\n"
+        "▪️ 1 час — 700₽\\n"
+        "▪️ 2 часа — 1200₽\\n\\n"
+        "Предоплата — 50% от суммы.\\n"
         "Остаток оплачивается в студии после репетиции.",
         reply_markup=main_menu()
     )
@@ -136,22 +129,13 @@ async def show_prices(message: types.Message):
 @dp.message(lambda message: message.text == "📋 Правила студии")
 async def show_rules(message: types.Message):
     await message.answer(
-        "Правила Machata studio:
-
-"
-        "▪️ Работаем круглосуточно по предварительной записи.
-"
-        "▪️ Бронь удерживается 30 минут до внесения предоплаты, затем слот может быть освобождён.
-"
-        "▪️ При опоздании более 15 минут время не продлевается.
-"
-        "▪️ Бережно относитесь к оборудованию, обо всех неисправностях сообщайте администратору.
-"
-        "▪️ Отмена за 24 часа и ранее — без штрафа, позже — предоплата не возвращается.
-
-"
-        "Адрес студии: [укажи свой адрес]
-"
+        "Правила Machata studio:\\n\\n"
+        "▪️ Работаем круглосуточно по предварительной записи.\\n"
+        "▪️ Бронь удерживается 30 минут до внесения предоплаты, затем слот может быть освобождён.\\n"
+        "▪️ При опоздании более 15 минут время не продлевается.\\n"
+        "▪️ Бережно относитесь к оборудованию, обо всех неисправностях сообщайте администратору.\\n"
+        "▪️ Отмена за 24 часа и ранее — без штрафа, позже — предоплата не возвращается.\\n\\n"
+        "Адрес студии: [укажи свой адрес]\\n"
         "Для связи с администратором: [укажи контакт]",
         reply_markup=main_menu()
     )
@@ -175,10 +159,7 @@ async def process_date_selection(callback: types.CallbackQuery, state: FSMContex
     date_formatted = date_obj.strftime("%d.%m.%Y")
     
     await callback.message.edit_text(
-        f"Выбрана дата: {date_formatted}
-
-Выберите время:
-"
+        f"Выбрана дата: {date_formatted}\\n\\nВыберите время:\\n"
         f"✅ — свободно | ❌ — занято",
         reply_markup=generate_time_keyboard(selected_date)
     )
@@ -204,18 +185,11 @@ async def process_time_selection(callback: types.CallbackQuery, state: FSMContex
     ])
     
     await callback.message.edit_text(
-        f"Подтвердите бронирование:
-
-"
-        f"📅 Дата: {date_formatted}
-"
-        f"🕐 Время: {selected_time}
-"
-        f"💰 Стоимость: 700₽
-"
-        f"💳 Предоплата: 350₽ (50%)
-
-"
+        f"Подтвердите бронирование:\\n\\n"
+        f"📅 Дата: {date_formatted}\\n"
+        f"🕐 Время: {selected_time}\\n"
+        f"💰 Стоимость: 700₽\\n"
+        f"💳 Предоплата: 350₽ (50%)\\n\\n"
         f"Для оплаты свяжитесь с администратором: [укажи контакт]",
         reply_markup=keyboard
     )
@@ -239,19 +213,11 @@ async def confirm_booking(callback: types.CallbackQuery, state: FSMContext):
     date_formatted = date_obj.strftime("%d.%m.%Y")
     
     await callback.message.edit_text(
-        f"✅ Бронирование подтверждено!
-
-"
-        f"📅 Дата: {date_formatted}
-"
-        f"🕐 Время: {time}
-
-"
-        f"Внесите предоплату 350₽ в течение 30 минут.
-"
-        f"После оплаты слот будет зарезервирован за вами.
-
-"
+        f"✅ Бронирование подтверждено!\\n\\n"
+        f"📅 Дата: {date_formatted}\\n"
+        f"🕐 Время: {time}\\n\\n"
+        f"Внесите предоплату 350₽ в течение 30 минут.\\n"
+        f"После оплаты слот будет зарезервирован за вами.\\n\\n"
         f"Контакт администратора: [укажи контакт]"
     )
     await state.clear()
