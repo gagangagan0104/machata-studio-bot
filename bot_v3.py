@@ -159,7 +159,6 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"💵 Предоплата: {prepayment}₽ (50%)\n\n"
             f"Для оплаты свяжитесь с администратором: [укажи контакт]",
             reply_markup=reply_markup
-        )
 
 elif query.data == 'confirm':
     # Сохраняем бронирование
