@@ -3,11 +3,13 @@
 
 import os
 import logging
+import asyncio
 from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 from yookassa import Configuration, Payment
 import uuid
+from aiohttp import web
 
 # Настройка логирования
 logging.basicConfig(
@@ -240,9 +242,13 @@ async def check_payment_status(payment_id: str, context: ContextTypes.DEFAULT_TY
         logger.error(f"Ошибка проверки статуса платежа: {e}")
         return None
 
+async def health(request):
+    """Health check endpoint для Render"""
+    return web.Response(text="OK")
 
-def main():
-    """Запуск бота"""
+
+async def run_bot():
+    """Запуск бота в polling режиме"""
     if not TOKEN:
         logger.error("BOT_TOKEN не установлен!")
         return
@@ -256,8 +262,42 @@ def main():
     
     # Запускаем бота
     logger.info("Бот запущен!")
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    await application.initialize()
+    await application.start()
+    await application.updater.start_polling(allowed_updates=Update.ALL_TYPES)
+    
+    # Ждём бесконечно
+    await asyncio.Event().wait()
 
+
+async def run_server():
+    """Запуск HTTP сервера для Render"""
+    app = web.Application()
+    app.router.add_get('/', health)
+    app.router.add_get('/health', health)
+    
+    port = int(os.environ.get('PORT', 10000))
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    await site.start()
+    logger.info(f"HTTP сервер запущен на порту {port}")
+    
+    # Ждём бесконечно
+    await asyncio.Event().wait()
+
+
+def main():
+    """Запуск бота"""    """Главная функция запуска"""
+    async def async_main():
+        # Запускаем HTTP сервер и бота параллельно
+        await asyncio.gather(
+            run_server(),
+            run_bot()
+        )
+    
+    # Запускаем асинхронную главную функцию
+    asyncio.run(async_main())
 
 if __name__ == '__main__':
     main()
