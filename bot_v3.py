@@ -160,3 +160,125 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"Для оплаты свяжитесь с администратором: [укажи контакт]",
             reply_markup=reply_markup
         )
+
+elif query.data == 'confirm':
+    # Сохраняем бронирование
+    booking_data = user_data[user_id]
+    booking_id = f"{user_id}_{booking_data['date']}_{booking_data['time']}"
+    bookings[booking_id] = booking_data
+    
+    # Уведомляем администратора
+    if ADMIN_CHAT_ID:
+        admin_message = (
+            f"🆕 Новое бронирование!\n\n"
+            f"👤 Пользователь: {query.from_user.full_name} (@{query.from_user.username})\n"
+            f"📅 Дата: {booking_data['date'].strftime('%d.%m.%Y')}\n"
+            f"🕐 Время: {booking_data['time']}\n"
+            f"⏱ Продолжительность: {booking_data['hours']} ч.\n"
+            f"💰 Стоимость: {booking_data['amount']}₽"
+        )
+        try:
+            await context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=admin_message)
+        except Exception as e:
+            logger.error(f"Не удалось отправить уведомление администратору: {e}")
+    
+    await query.edit_message_text(
+        "✅ Бронирование подтверждено!\n\n"
+        "Администратор скоро с вами свяжется для подтверждения оплаты."
+    )
+    
+    # Очищаем временные данные
+    if user_id in user_data:
+        del user_data[user_id]
+
+elif query.data == 'cancel':
+    if user_id in user_data:
+        del user_data[user_id]
+    await query.edit_message_text("❌ Бронирование отменено.")
+    
+elif query.data == 'start':
+    keyboard = [
+        [InlineKeyboardButton("📅 Забронировать репетицию", callback_data='book')],
+        [InlineKeyboardButton("💰 Цены", callback_data='prices')],
+        [InlineKeyboardButton("📍 Адрес студии", callback_data='address')],
+        [InlineKeyboardButton("📞 Контакты", callback_data='contacts')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.edit_message_text(
+        "🎵 Добро пожаловать в Machata Studio!\n\n"
+        "Я помогу вам забронировать репетицию.\n"
+        "Выберите нужное действие:",
+        reply_markup=reply_markup
+    )
+
+elif query.data == 'prices':
+    await query.edit_message_text(
+        f"💰 Стоимость репетиции:\n\n"
+        f"⏱ 1 час: {PRICE_PER_HOUR}₽\n"
+        f"⏱ 2 часа: {PRICE_PER_HOUR * 2}₽\n"
+        f"⏱ 3 часа: {PRICE_PER_HOUR * 3}₽\n\n"
+        f"🕐 Часы работы: 10:00 - 22:00",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("« Назад", callback_data='start')]])
+    )
+
+elif query.data == 'address':
+    await query.edit_message_text(
+        "📍 Адрес: [укажи адрес студии]\n\n"
+        "🚇 Метро: [укажи ближайшее метро]",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("« Назад", callback_data='start')]])
+    )
+
+elif query.data == 'contacts':
+    await query.edit_message_text(
+        "📞 Контакты:\n\n"
+        "📱 Телефон: [укажи телефон]\n"
+        "✉️ Email: [укажи email]\n"
+        "💬 Telegram: [укажи @username]",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("« Назад", callback_data='start')]])
+    )
+
+
+if __name__ == '__main__':
+    import asyncio
+    from aiohttp import web
+    
+    print("Бот запускается...")
+    
+    # Создаем приложение
+    application = Application.builder().token(TOKEN).build()
+    
+    # Регистрируем обработчики
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CallbackQueryHandler(button_callback))
+    
+    # HTTP сервер для Render health check
+    async def health(request):
+        return web.Response(text='OK')
+    
+    app = web.Application()
+    app.router.add_get('/', health)
+    app.router.add_get('/health', health)
+    
+    async def run_bot():
+        await application.initialize()
+        await application.start()
+        await application.updater.start_polling()
+        print("Бот успешно запущен!")
+    
+    async def run_web(port):
+        runner = web.AppRunner(app)
+        await runner.setup()
+        site = web.TCPSite(runner, '0.0.0.0', port)
+        await site.start()
+        print(f"HTTP сервер запущен на порту {port}")
+    
+    async def main():
+        port = int(os.environ.get('PORT', 10000))
+        await asyncio.gather(
+            run_bot(),
+            run_web(port)
+        )
+        # Держим программу запущенной
+        await asyncio.Event().wait()
+    
+    asyncio.run(main())
