@@ -150,7 +150,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
-        await query.edit_message_text(
+        await query.edit_message_text()
             f"📋 Подтвердите бронирование:\n\n"
             f"📅 Дата: {date.strftime('%d.%m.%Y')}\n"
             f"🕐 Время: {time}\n"
