@@ -596,20 +596,32 @@ async def main():
     await site.start()
     
     logging.info(f"Web server started on port {PORT}")
-    logging.info("Bot started")
     
-    # Очищаем webhook и запускаем polling
-    await bot.delete_webhook(drop_pending_updates=True)
+    # Очищаем webhook перед запуском polling
+    try:
+        webhook_info = await bot.get_webhook_info()
+        if webhook_info.url:
+            logger.info(f"Deleting existing webhook: {webhook_info.url}")
+            await bot.delete_webhook(drop_pending_updates=True)
+            await asyncio.sleep(1)  # Небольшая задержка для завершения удаления
+        else:
+            logger.info("No webhook found, using polling")
+    except Exception as e:
+        logger.error(f"Error checking/deleting webhook: {e}")
+        # Пытаемся удалить webhook в любом случае
+        try:
+            await bot.delete_webhook(drop_pending_updates=True)
+            await asyncio.sleep(1)
+        except:
+            pass
     
-    # Запускаем polling в фоне
-    async def run_polling():
-        await dp.start_polling(bot)
-    
-    asyncio.create_task(run_polling())
-    
-    # Держим сервис живым
-    while True:
-        await asyncio.sleep(3600)  # Проверяем каждый час
+    # Запускаем polling
+    logger.info("Starting bot polling...")
+    try:
+        await dp.start_polling(bot, allowed_updates=["message", "callback_query"])
+    except Exception as e:
+        logger.error(f"Error in polling: {e}")
+        raise
 
 if __name__ == "__main__":
     asyncio.run(main())
