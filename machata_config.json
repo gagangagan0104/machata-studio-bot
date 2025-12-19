@@ -1,0 +1,28 @@
+{
+  "prices": {
+    "repet": 700,
+    "studio": 800,
+    "full": 1500
+  },
+  "work_hours": {
+    "start": 9,
+    "end": 22
+  },
+  "off_days": [
+    5,
+    6
+  ],
+  "payment": {
+    "phone": "+7 (977) 777-78-27",
+    "card": "2202 2000 0000 0000",
+    "bank": "Сбербанк"
+  },
+  "studio": {
+    "name": "🎵 MACHATA studio — Академия звука",
+    "address": "Москва, Загородное шоссе, 1 корпус 2",
+    "hours": "Пн–Пт 9:00–22:00 | Сб–Вс 11:00–20:00",
+    "contact": "+7 (977) 777-78-27",
+    "telegram": "@majesticbudan",
+    "email": "hello@machata.studio"
+  }
+}
