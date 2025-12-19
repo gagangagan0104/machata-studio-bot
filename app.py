@@ -1019,5 +1019,12 @@ if __name__ == '__main__':
     print(f"☎️ Контакт: {STUDIO_CONTACT}")
     print(f"📍 Telegram: {STUDIO_TELEGRAM}\n")
     
-    # Для локальной разработки
+# В КОНЦЕ ФАЙЛА app.py:
+
+bot = telebot.TeleBot(API_TOKEN, threaded=False)
+app = Flask(__name__)  # <-- Эта строка ОБЯЗАТЕЛЬНА!
+
+# ... все твои обработчики и роуты ...
+
+if __name__ == '__main__':
     app.run(host='0.0.0.0', port=10000, debug=False)
