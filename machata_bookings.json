@@ -1,0 +1,89 @@
+[
+  {
+    "id": 1766101520,
+    "user_id": 666267758,
+    "service": "repet",
+    "date": "2025-12-25",
+    "times": [
+      12,
+      13
+    ],
+    "duration": 2,
+    "name": "1",
+    "phone": "22",
+    "comment": "2",
+    "price": 1200,
+    "status": "cancelled",
+    "created_at": "2025-12-19T02:45:20.737542"
+  },
+  {
+    "id": 1766104091,
+    "user_id": 666267758,
+    "service": "studio",
+    "date": "2025-12-26",
+    "times": [
+      10,
+      11,
+      12
+    ],
+    "duration": 3,
+    "name": "бомба",
+    "phone": "78978",
+    "comment": "hh",
+    "price": 2160,
+    "status": "cancelled",
+    "created_at": "2025-12-19T03:28:11.932482"
+  },
+  {
+    "id": 1766104887,
+    "user_id": 666267758,
+    "service": "studio",
+    "date": "2025-12-24",
+    "times": [
+      10,
+      11
+    ],
+    "duration": 2,
+    "name": "876",
+    "phone": "79999999",
+    "comment": "kk",
+    "price": 1600,
+    "status": "cancelled",
+    "created_at": "2025-12-19T03:41:27.168809"
+  },
+  {
+    "id": 1766106164,
+    "user_id": 666267758,
+    "service": "studio",
+    "date": "2025-12-30",
+    "times": [
+      19,
+      20,
+      21
+    ],
+    "duration": 3,
+    "name": "Лимит",
+    "phone": "55",
+    "comment": "Ййй",
+    "price": 2160,
+    "status": "cancelled",
+    "created_at": "2025-12-19T04:02:44.338189"
+  },
+  {
+    "id": 1766107157,
+    "user_id": 666267758,
+    "service": "repet",
+    "date": "2025-12-30",
+    "times": [
+      13,
+      14
+    ],
+    "duration": 2,
+    "name": "7",
+    "phone": "79888888888",
+    "comment": "-",
+    "price": 1400,
+    "status": "pending",
+    "created_at": "2025-12-19T04:19:17.152629"
+  }
+]
