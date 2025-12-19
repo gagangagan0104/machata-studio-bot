@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import sys
 import traceback
 from flask import Flask, request
+import time
 
 # ====== КОНФИГ ======================================================
 API_TOKEN = os.environ.get("API_TOKEN", "8081224286:AAHAty9YsUluB9MDF6UIsJu3lBgESEnS9Wo")
@@ -856,13 +857,15 @@ app = Flask(__name__)
 
 @app.route("/", methods=["GET"])
 def health():
-    return "🎵 MACHATA bot работает!", 200
+    log_info("Health check")
+    return "🎵 MACHATA bot работает! ✅", 200
 
 @app.route(f"/{API_TOKEN}/", methods=["POST"])
 def webhook():
     try:
         json_data = request.get_json()
         if json_data:
+            log_info(f"Webhook получен: {len(str(json_data))} bytes")
             update = telebot.types.Update.de_json(json_data)
             bot.process_new_updates([update])
         return "ok", 200
@@ -882,14 +885,37 @@ if __name__ == "__main__":
     PORT = int(os.environ.get("PORT", 10000))
     RENDER_URL = os.environ.get("RENDER_EXTERNAL_URL", "")
     
+    log_info(f"PORT: {PORT}")
+    log_info(f"RENDER_URL: {RENDER_URL if RENDER_URL else 'NOT SET'}")
+    
     if RENDER_URL:
         log_info(f"🌐 РЕЖИМ RENDER (webhook)")
-        log_info(f"Webhook URL: {RENDER_URL}/{API_TOKEN}/")
+        webhook_url = f"{RENDER_URL}/{API_TOKEN}/"
+        log_info(f"Webhook URL: {webhook_url}")
         try:
+            # Небольшая задержка перед установкой webhook
+            time.sleep(1)
+            
+            # Сначала удаляем старый webhook
+            log_info("Удаление старого webhook...")
             bot.remove_webhook()
-            bot.set_webhook(url=f"{RENDER_URL}/{API_TOKEN}/")
+            log_info("✅ Старый webhook удален")
+            
+            # Небольшая задержка
+            time.sleep(1)
+            
+            # Затем устанавливаем новый
+            log_info("Установка нового webhook...")
+            bot.set_webhook(url=webhook_url, drop_pending_updates=True)
             log_info("✅ Webhook установлен успешно")
+            
+            # Проверяем статус
+            time.sleep(1)
+            info = bot.get_webhook_info()
+            log_info(f"Статус webhook: URL={info.url}, pending_updates={info.pending_update_count}")
         except Exception as e:
             log_error(f"Ошибка при настройке webhook: {str(e)}", e)
+    else:
+        log_info("⚠️ RENDER_EXTERNAL_URL не установлена! Webhook не может быть настроен.")
     
     app.run(host="0.0.0.0", port=PORT, debug=False)
