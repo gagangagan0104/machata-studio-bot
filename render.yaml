@@ -3,7 +3,7 @@ services:
     name: machata-bot
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn machata_bot:app
+    startCommand: gunicorn machata_bot.py
     envVars:
       - key: API_TOKEN
         sync: false
