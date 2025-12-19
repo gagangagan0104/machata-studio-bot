@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 # ====== КОНФИГ ======================================================
 
 API_TOKEN = '8081224286:AAHAty9YsUluB9MDF6UIsJu3lBgESEnS9Wo'
+STUDIO_NAME = "MACHATA studio"
 BOOKINGS_FILE = 'machata_bookings.json'
 CONFIG_FILE = 'machata_config.json'
 
