@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 
 # ====== КОНФИГ ======================================================
 
-API_TOKEN = '7788156343:AAEflbPqrFjVCBw-Dy_FiRiCH5K_WV5X9dY'  # ВСТАВЬ СВОЙ ТОКЕН
+API_TOKEN = '8081224286:AAHAty9YsUluB9MDF6UIsJu3lBgESEnS9Wo'  # ВСТАВЬ СВОЙ ТОКЕН
 WEBHOOK_URL = 'https://machata-studio-bot.onrender.com/webhook'
 
 BOOKINGS_FILE = 'machata_bookings.json'
