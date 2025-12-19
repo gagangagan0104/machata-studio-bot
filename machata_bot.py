@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 # ====== КОНФИГ ======================================================
 
-API_TOKEN = '8081224286:AAHAty9YsUluB9MDF6UIsJu3lBgESEnS9Wo'
+API_TOKEN = os.environ.get("API_TOKEN", "8081224286:AAHAty9YsUluB9MDF6UIsJu3lBgESEnS9Wo")
 STUDIO_NAME = "MACHATA studio"
 BOOKINGS_FILE = 'machata_bookings.json'
 CONFIG_FILE = 'machata_config.json'
@@ -185,7 +185,6 @@ def times_keyboard(chat_id, date_str, service):
     
     buttons = []
     for h in range(config['work_hours']['start'], config['work_hours']['end']):
-        time_str = f"{h:02d}:00"
         if h in booked:
             buttons.append(types.InlineKeyboardButton("❌", callback_data="skip"))
         elif h in selected:
@@ -201,19 +200,15 @@ def times_keyboard(chat_id, date_str, service):
         config = load_config()
         base_price = config['prices'].get(service, 0) * len(selected)
         discount = ""
-        discount_percent = 0
         
         vip_discount = get_user_discount(chat_id)
         if vip_discount > 0:
-            discount_percent = vip_discount
             base_price = int(base_price * (1 - vip_discount / 100))
             discount = f" (VIP скидка {vip_discount}%)"
         elif len(selected) >= 5:
-            discount_percent = 15
             base_price = int(base_price * 0.85)
             discount = " (скидка за 5+ часов: -15%)"
         elif len(selected) >= 3:
-            discount_percent = 10
             base_price = int(base_price * 0.9)
             discount = " (скидка за 3+ часа: -10%)"
         
@@ -912,16 +907,12 @@ def cb_back_to_bookings(c):
 # ====== ЗАПУСК =======================================================
 
 from flask import Flask, request
-import os
 
 app = Flask(__name__)
 PORT = int(os.environ.get("PORT", 10000))
 RENDER_EXTERNAL_URL = os.environ.get("RENDER_EXTERNAL_URL", "")
 
-# Определяем режим
 IS_LOCAL = not RENDER_EXTERNAL_URL
-
-# ====== FLASK ROUTES ================================================
 
 @app.route("/", methods=["GET"])
 def health():
@@ -941,7 +932,6 @@ if __name__ == "__main__":
     print("📍 Telegram: " + STUDIO_TELEGRAM)
     
     if IS_LOCAL:
-        # Локальный режим - polling
         print("\n🚀 Локальный режим (polling)...")
         print("Нажми Ctrl+C чтобы остановить…\n")
         try:
@@ -951,11 +941,11 @@ if __name__ == "__main__":
             import time
             time.sleep(5)
     else:
-        # Render режим - webhook
         print(f"\n🌐 Режим Render (webhook)")
         print(f"Webhook URL: {RENDER_EXTERNAL_URL}/{API_TOKEN}/")
         
         try:
+            bot.remove_webhook()
             bot.set_webhook(url=f"{RENDER_EXTERNAL_URL}/{API_TOKEN}/")
             print("✅ Webhook установлен")
             print(f"🚀 Flask запущен на порту {PORT}...\n")
@@ -963,6 +953,5 @@ if __name__ == "__main__":
             app.run(host="0.0.0.0", port=PORT, debug=False)
         except Exception as e:
             print(f"❌ Ошибка webhook: {e}")
-            # Fallback на polling
             print("Переключаюсь на polling режим...")
             bot.infinity_polling()
