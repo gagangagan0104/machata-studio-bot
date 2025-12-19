@@ -911,16 +911,58 @@ def cb_back_to_bookings(c):
 
 # ====== ЗАПУСК =======================================================
 
+from flask import Flask, request
+import os
+
+app = Flask(__name__)
+PORT = int(os.environ.get("PORT", 10000))
+RENDER_EXTERNAL_URL = os.environ.get("RENDER_EXTERNAL_URL", "")
+
+# Определяем режим
+IS_LOCAL = not RENDER_EXTERNAL_URL
+
+# ====== FLASK ROUTES ================================================
+
+@app.route("/", methods=["GET"])
+def health():
+    return "🎵 MACHATA bot работает!", 200
+
+@app.route(f"/{API_TOKEN}/", methods=["POST"])
+def webhook():
+    json_data = request.get_json()
+    update = telebot.types.Update.de_json(json_data)
+    bot.process_new_updates([update])
+    return "ok", 200
+
 if __name__ == "__main__":
     print("🎵 MACHATA studio бот запущен!")
     print("✨ Полнофункциональная версия с VIP скидками + валидацией телефона")
     print("☎️ Контакт: " + STUDIO_CONTACT)
     print("📍 Telegram: " + STUDIO_TELEGRAM)
-    print("Нажми Ctrl+C чтобы остановить…\n")
-    try:
-        bot.infinity_polling()
-    except Exception as e:
-        print(f"❌ Ошибка: {e}")
-        print("Перезапускаю через 5 секунд…")
-        import time
-        time.sleep(5)
+    
+    if IS_LOCAL:
+        # Локальный режим - polling
+        print("\n🚀 Локальный режим (polling)...")
+        print("Нажми Ctrl+C чтобы остановить…\n")
+        try:
+            bot.infinity_polling()
+        except Exception as e:
+            print(f"❌ Ошибка: {e}")
+            import time
+            time.sleep(5)
+    else:
+        # Render режим - webhook
+        print(f"\n🌐 Режим Render (webhook)")
+        print(f"Webhook URL: {RENDER_EXTERNAL_URL}/{API_TOKEN}/")
+        
+        try:
+            bot.set_webhook(url=f"{RENDER_EXTERNAL_URL}/{API_TOKEN}/")
+            print("✅ Webhook установлен")
+            print(f"🚀 Flask запущен на порту {PORT}...\n")
+            
+            app.run(host="0.0.0.0", port=PORT, debug=False)
+        except Exception as e:
+            print(f"❌ Ошибка webhook: {e}")
+            # Fallback на polling
+            print("Переключаюсь на polling режим...")
+            bot.infinity_polling()
