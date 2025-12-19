@@ -11,11 +11,10 @@ BOOKINGS_FILE = 'machata_bookings.json'
 CONFIG_FILE = 'machata_config.json'
 
 STUDIO_CONTACT = "+7 (977) 777-78-27"
-STUDIO_CONTACT_2 = "+7 (929) 909-09-89"
 STUDIO_ADDRESS = "Москва, Загородное шоссе, 1 корпус 2"
 STUDIO_HOURS = "Пн–Пт 9:00–03:00 | Сб–Вс 09:00–09:00"
 STUDIO_TELEGRAM = "@majesticbudan"
-STUDIO_TELEGRAM_2 = "@saxaffon"
+
 
 VIP_USERS = {
     123456789: {'name': 'Иван Рок', 'discount': 20},
