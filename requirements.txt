@@ -1,4 +1,4 @@
-pytelegrambotapi==4.14.0
-flask==2.3.0
+pyTeleBot==4.14.0
+Flask==3.0.0
 gunicorn==21.2.0
-requests==2.31.0
+python-dotenv==1.0.0
