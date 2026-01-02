@@ -10,6 +10,7 @@ import requests
 import uuid
 import base64
 import time
+import threading
 from flask import Flask, request
 
 # ====== КОНФИГУРАЦИЯ ======================================================
@@ -30,6 +31,9 @@ STUDIO_ADDRESS = "Москва, Загородное шоссе, 1 корпус 
 STUDIO_HOURS = "Пн–Пт 9:00–03:00 | Сб–Вс 09:00–09:00"
 STUDIO_TELEGRAM = "@majesticbudan"
 STUDIO_EMAIL = "hello@machata.studio"
+
+# Администратор (ID чата для уведомлений и админ-панели)
+ADMIN_CHAT_ID = int(os.environ.get("ADMIN_CHAT_ID", "0"))  # Установите свой chat_id через переменную окружения
 
 # VIP пользователи
 VIP_USERS = {
@@ -192,7 +196,11 @@ def get_booked_slots(date_str, service):
 
 # ====== КЛАВИАТУРЫ ========================================================
 
-def main_menu_keyboard():
+def is_admin(chat_id):
+    """Проверка, является ли пользователь администратором"""
+    return ADMIN_CHAT_ID > 0 and chat_id == ADMIN_CHAT_ID
+
+def main_menu_keyboard(chat_id=None):
     """Главное меню"""
     kb = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
     kb.add(
@@ -210,6 +218,11 @@ def main_menu_keyboard():
     kb.add(
         types.KeyboardButton("📋 Правила")
     )
+    # Добавляем админ-панель только для администратора
+    if chat_id and is_admin(chat_id):
+        kb.add(
+            types.KeyboardButton("👨‍💼 Админ-панель")
+        )
     return kb
 
 def cancel_keyboard():
@@ -524,7 +537,7 @@ def send_welcome(m):
         bot.send_message(
             chat_id,
             format_welcome(chat_id),
-            reply_markup=main_menu_keyboard(),
+            reply_markup=main_menu_keyboard(chat_id),
             parse_mode='HTML'
         )
     except Exception as e:
@@ -535,7 +548,7 @@ def to_main_menu(m):
     """Возврат в главное меню"""
     chat_id = m.chat.id
     user_states.pop(chat_id, None)
-    bot.send_message(chat_id, "\n🏠 <b>ГЛАВНОЕ МЕНЮ</b>\n\n\n<b>🎵 Выбери действие:</b>", reply_markup=main_menu_keyboard(), parse_mode='HTML')
+    bot.send_message(chat_id, "🏠 <b>ГЛАВНОЕ МЕНЮ</b>\n\n<b>🎵 Выбери действие:</b>", reply_markup=main_menu_keyboard(chat_id), parse_mode='HTML')
 
 @bot.message_handler(func=lambda m: m.text == "🎙 Запись трека")
 def book_recording(m):
@@ -607,7 +620,7 @@ def my_bookings(m):
         bot.send_message(
             chat_id,
             "📭 <b>ПОКА НЕТ БРОНЕЙ</b>\n\n🎵 <b>Создадим первую?</b>\n\n💡 Выбери услугу в главном меню и забронируй время!\n\n✨ После оплаты все твои брони будут здесь\n🎯 Управляй своими сеансами в одном месте",
-            reply_markup=main_menu_keyboard(),
+            reply_markup=main_menu_keyboard(chat_id),
             parse_mode='HTML'
         )
         return
@@ -631,7 +644,7 @@ def location(m):
     kb.add(types.InlineKeyboardButton("🗺️ 2ГИС", url="https://2gis.ru/moscow/search/MACHATA"))
     
     bot.send_message(chat_id, format_location(), reply_markup=kb, parse_mode='HTML')
-    bot.send_message(chat_id, "\n🏠 <b>ГЛАВНОЕ МЕНЮ</b>\n\n\n<b>🎵 Выбери действие:</b>", reply_markup=main_menu_keyboard(), parse_mode='HTML')
+    bot.send_message(chat_id, "🏠 <b>ГЛАВНОЕ МЕНЮ</b>\n\n<b>🎵 Выбери действие:</b>", reply_markup=main_menu_keyboard(chat_id), parse_mode='HTML')
 
 @bot.message_handler(func=lambda m: m.text == "💬 Поддержка")
 def live_chat(m):
@@ -659,13 +672,71 @@ def live_chat(m):
 🎵 <b>Твоя музыка — наш приоритет!</b>"""
     
     bot.send_message(chat_id, text, reply_markup=kb, parse_mode='HTML')
-    bot.send_message(chat_id, "\n🏠 <b>ГЛАВНОЕ МЕНЮ</b>\n\n\n<b>🎵 Выбери действие:</b>", reply_markup=main_menu_keyboard(), parse_mode='HTML')
+    bot.send_message(chat_id, "🏠 <b>ГЛАВНОЕ МЕНЮ</b>\n\n<b>🎵 Выбери действие:</b>", reply_markup=main_menu_keyboard(chat_id), parse_mode='HTML')
 
 @bot.message_handler(func=lambda m: m.text == "📋 Правила")
 def show_rules(m):
     """Показ правил использования студии"""
     chat_id = m.chat.id
-    bot.send_message(chat_id, format_rules(), reply_markup=main_menu_keyboard(), parse_mode='HTML')
+    bot.send_message(chat_id, format_rules(), reply_markup=main_menu_keyboard(chat_id), parse_mode='HTML')
+
+@bot.message_handler(func=lambda m: m.text == "👨‍💼 Админ-панель")
+def admin_panel(m):
+    """Админ-панель"""
+    chat_id = m.chat.id
+    if not is_admin(chat_id):
+        bot.send_message(chat_id, "❌ <b>Доступ запрещён</b>", parse_mode='HTML')
+        return
+    
+    kb = types.InlineKeyboardMarkup()
+    kb.add(types.InlineKeyboardButton("📋 Все бронирования", callback_data="admin_all_bookings"))
+    kb.add(types.InlineKeyboardButton("📅 Бронирования сегодня", callback_data="admin_today_bookings"))
+    kb.add(types.InlineKeyboardButton("📅 Бронирования завтра", callback_data="admin_tomorrow_bookings"))
+    
+    text = """👨‍💼 <b>АДМИН-ПАНЕЛЬ</b>
+
+<b>Выбери действие:</b>"""
+    bot.send_message(chat_id, text, reply_markup=kb, parse_mode='HTML')
+
+# ====== АДМИН ФУНКЦИИ ====================================================
+
+def format_admin_booking(booking):
+    """Форматирование бронирования для администратора"""
+    names = {
+        'repet': '🎸 Репетиция',
+        'studio': '🎧 Студия (самостоятельная)',
+        'full': '✨ Студия со звукорежем',
+    }
+    
+    date_str = booking.get('date', '')
+    times = booking.get('times', [])
+    if times:
+        start = min(times)
+        end = max(times) + 1
+        time_str = f"{start:02d}:00–{end:02d}:00 ({len(times)}ч)"
+    else:
+        time_str = "Время не указано"
+    
+    status = booking.get('status', 'pending')
+    status_text = {
+        'pending': '⏳ Ожидает оплаты',
+        'paid': '✅ Оплачено',
+        'cancelled': '❌ Отменено',
+    }.get(status, status)
+    
+    return f"""📋 <b>Бронь #{booking.get('id', 'N/A')}</b>
+
+<b>Услуга:</b> {names.get(booking.get('service', ''), booking.get('service', ''))}
+<b>Дата:</b> {date_str}
+<b>Время:</b> {time_str}
+<b>Сумма:</b> {booking.get('price', 0)} ₽
+<b>Статус:</b> {status_text}
+
+<b>Клиент:</b>
+👤 Имя: {booking.get('name', 'N/A')}
+☎️ Телефон: {booking.get('phone', 'N/A')}
+📧 Email: {booking.get('email', 'N/A')}
+💬 Комментарий: {booking.get('comment', '-')}"""
 
 # ====== CALLBACK ОБРАБОТЧИКИ ============================================
 
@@ -674,7 +745,7 @@ def cb_cancel(c):
     chat_id = c.message.chat.id
     user_states.pop(chat_id, None)
     bot.edit_message_text("❌ <b>Отменено</b>", chat_id, c.message.message_id, parse_mode='HTML')
-    bot.send_message(chat_id, "\n🏠 <b>ГЛАВНОЕ МЕНЮ</b>\n\n\n<b>🎵 Выбери действие:</b>", reply_markup=main_menu_keyboard(), parse_mode='HTML')
+    bot.send_message(chat_id, "🏠 <b>ГЛАВНОЕ МЕНЮ</b>\n\n<b>🎵 Выбери действие:</b>", reply_markup=main_menu_keyboard(chat_id), parse_mode='HTML')
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("service_"))
 def cb_service(c):
@@ -1296,7 +1367,7 @@ def complete_booking(chat_id):
             bot.send_message(
                 chat_id,
                 f"\n⚠️ <b>ОШИБКА ОПЛАТЫ</b>   \n\n\n❌ <b>Не удалось создать платёж</b>\n\n💡 <b>Что делать:</b>\n   • Попробуй ещё раз через минуту\n   • Или свяжись с нами — мы поможем!\n\n\n\n<b>📞 КОНТАКТЫ:</b>\n📱 <b>Telegram:</b> {STUDIO_TELEGRAM}\n☎️ <b>Телефон:</b> {STUDIO_CONTACT}\n\n<b>🎵 Мы всегда готовы помочь!</b>",
-                reply_markup=main_menu_keyboard(),
+                reply_markup=main_menu_keyboard(chat_id),
                 parse_mode='HTML'
             )
             cancel_booking_by_id(booking_id)
@@ -1555,7 +1626,7 @@ def cb_cancel_booking_confirm(c):
             bot.send_message(
                 chat_id,
                 f"\n⚠️ <b>БРОНЬ ОПЛАЧЕНА</b>   \n\n\n<b>Эта бронь уже оплачена.</b>\n\n\n\n<b>📞 Для отмены свяжись с нами:</b>\n\n📱 <b>Telegram:</b> {STUDIO_TELEGRAM}\n☎️ <b>Телефон:</b> {STUDIO_CONTACT}\n\n\n\n💡 <b>Условия возврата:</b>\n   • Отмена менее чем за 24 часа → возврат 50%\n   • Отмена более чем за 24 часа → полный возврат\n\n<b>🎵 Мы всегда готовы помочь!</b>",
-                reply_markup=main_menu_keyboard(),
+                reply_markup=main_menu_keyboard(chat_id),
                 parse_mode='HTML'
             )
         else:
@@ -1565,7 +1636,7 @@ def cb_cancel_booking_confirm(c):
                 chat_id, c.message.message_id,
                 parse_mode='HTML'
             )
-            bot.send_message(chat_id, "\n🏠 <b>ГЛАВНОЕ МЕНЮ</b>\n\n\n<b>🎵 Выбери действие:</b>", reply_markup=main_menu_keyboard(), parse_mode='HTML')
+            bot.send_message(chat_id, "🏠 <b>ГЛАВНОЕ МЕНЮ</b>\n\n<b>🎵 Выбери действие:</b>", reply_markup=main_menu_keyboard(chat_id), parse_mode='HTML')
     else:
         bot.answer_callback_query(c.id, "❌ Ошибка при отмене")
 
@@ -1577,6 +1648,173 @@ def cb_back_to_bookings(c):
     
     if kb:
         bot.edit_message_text("<b>📋 Твои сеансы:</b>\n\nТапни для деталей:", chat_id, c.message.message_id, reply_markup=kb, parse_mode='HTML')
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith("admin_"))
+def cb_admin(c):
+    """Обработчики админ-панели"""
+    chat_id = c.message.chat.id
+    if not is_admin(chat_id):
+        bot.answer_callback_query(c.id, "❌ Доступ запрещён")
+        return
+    
+    bookings = load_bookings()
+    now = datetime.now()
+    today = now.strftime("%Y-%m-%d")
+    tomorrow = (now + timedelta(days=1)).strftime("%Y-%m-%d")
+    
+    if c.data == "admin_all_bookings":
+        # Все бронирования
+        active_bookings = [b for b in bookings if b.get('status') in ['paid', 'pending', 'awaiting_payment']]
+        if not active_bookings:
+            bot.answer_callback_query(c.id, "📭 Нет активных бронирований")
+            bot.edit_message_text("📭 <b>Нет активных бронирований</b>", chat_id, c.message.message_id, parse_mode='HTML')
+            return
+        
+        text = f"📋 <b>ВСЕ АКТИВНЫЕ БРОНИРОВАНИЯ ({len(active_bookings)})</b>\n\n"
+        for booking in sorted(active_bookings, key=lambda x: (x.get('date', ''), min(x.get('times', [0])))):
+            text += format_admin_booking(booking) + "\n\n"
+        
+        bot.edit_message_text(text, chat_id, c.message.message_id, parse_mode='HTML')
+        bot.answer_callback_query(c.id, f"✅ Найдено {len(active_bookings)} бронирований")
+    
+    elif c.data == "admin_today_bookings":
+        # Бронирования сегодня
+        today_bookings = [b for b in bookings if b.get('date') == today and b.get('status') in ['paid', 'pending', 'awaiting_payment']]
+        if not today_bookings:
+            bot.answer_callback_query(c.id, "📭 Нет бронирований на сегодня")
+            bot.edit_message_text(f"📭 <b>Нет бронирований на {today}</b>", chat_id, c.message.message_id, parse_mode='HTML')
+            return
+        
+        text = f"📅 <b>БРОНИРОВАНИЯ СЕГОДНЯ ({len(today_bookings)})</b>\n\n"
+        for booking in sorted(today_bookings, key=lambda x: min(x.get('times', [0]))):
+            text += format_admin_booking(booking) + "\n\n"
+        
+        bot.edit_message_text(text, chat_id, c.message.message_id, parse_mode='HTML')
+        bot.answer_callback_query(c.id, f"✅ Найдено {len(today_bookings)} бронирований")
+    
+    elif c.data == "admin_tomorrow_bookings":
+        # Бронирования завтра
+        tomorrow_bookings = [b for b in bookings if b.get('date') == tomorrow and b.get('status') in ['paid', 'pending', 'awaiting_payment']]
+        if not tomorrow_bookings:
+            bot.answer_callback_query(c.id, "📭 Нет бронирований на завтра")
+            bot.edit_message_text(f"📭 <b>Нет бронирований на {tomorrow}</b>", chat_id, c.message.message_id, parse_mode='HTML')
+            return
+        
+        text = f"📅 <b>БРОНИРОВАНИЯ ЗАВТРА ({len(tomorrow_bookings)})</b>\n\n"
+        for booking in sorted(tomorrow_bookings, key=lambda x: min(x.get('times', [0]))):
+            text += format_admin_booking(booking) + "\n\n"
+        
+        bot.edit_message_text(text, chat_id, c.message.message_id, parse_mode='HTML')
+        bot.answer_callback_query(c.id, f"✅ Найдено {len(tomorrow_bookings)} бронирований")
+
+# ====== СИСТЕМА УВЕДОМЛЕНИЙ ==============================================
+
+def send_admin_notification(booking, notification_type):
+    """Отправка уведомления администратору"""
+    if not ADMIN_CHAT_ID or ADMIN_CHAT_ID <= 0:
+        return
+    
+    names = {
+        'repet': '🎸 Репетиция',
+        'studio': '🎧 Студия (самостоятельная)',
+        'full': '✨ Студия со звукорежем',
+    }
+    
+    date_str = booking.get('date', '')
+    times = booking.get('times', [])
+    if times:
+        start = min(times)
+        end = max(times) + 1
+        time_str = f"{start:02d}:00–{end:02d}:00 ({len(times)}ч)"
+    else:
+        time_str = "Время не указано"
+    
+    if notification_type == "24h":
+        emoji = "⏰"
+        title = "НАПОМИНАНИЕ: Бронь через 24 часа"
+    elif notification_type == "30m":
+        emoji = "🔔"
+        title = "НАПОМИНАНИЕ: Бронь через 30 минут"
+    else:
+        return
+    
+    text = f"""{emoji} <b>{title}</b>
+
+{format_admin_booking(booking)}
+
+<b>📞 Контакты клиента для связи:</b>
+☎️ {booking.get('phone', 'N/A')}
+📧 {booking.get('email', 'N/A')}"""
+    
+    try:
+        bot.send_message(ADMIN_CHAT_ID, text, parse_mode='HTML')
+        log_info(f"Уведомление администратору отправлено: {notification_type} для брони {booking.get('id')}")
+    except Exception as e:
+        log_error(f"Ошибка отправки уведомления администратору: {str(e)}", e)
+
+def check_and_send_notifications():
+    """Проверка и отправка уведомлений администратору"""
+    if not ADMIN_CHAT_ID or ADMIN_CHAT_ID <= 0:
+        return
+    
+    try:
+        bookings = load_bookings()
+        now = datetime.now()
+        
+        for booking in bookings:
+            if booking.get('status') not in ['paid', 'pending', 'awaiting_payment']:
+                continue
+            
+            date_str = booking.get('date', '')
+            times = booking.get('times', [])
+            if not date_str or not times:
+                continue
+            
+            try:
+                booking_date = datetime.strptime(date_str, "%Y-%m-%d")
+                start_hour = min(times)
+                booking_datetime = booking_date.replace(hour=start_hour, minute=0, second=0, microsecond=0)
+                
+                # Проверяем уведомление за 24 часа
+                time_until = booking_datetime - now
+                hours_until = time_until.total_seconds() / 3600
+                
+                # Проверяем, не отправляли ли уже уведомление за 24 часа
+                notified_24h = booking.get('notified_24h', False)
+                if 23.5 <= hours_until <= 24.5 and not notified_24h:
+                    send_admin_notification(booking, "24h")
+                    # Помечаем, что уведомление отправлено
+                    for i, b in enumerate(bookings):
+                        if b.get('id') == booking.get('id'):
+                            bookings[i]['notified_24h'] = True
+                            save_bookings(bookings)
+                            break
+                
+                # Проверяем уведомление за 30 минут
+                notified_30m = booking.get('notified_30m', False)
+                if 0.4 <= hours_until <= 0.6 and not notified_30m:
+                    send_admin_notification(booking, "30m")
+                    # Помечаем, что уведомление отправлено
+                    for i, b in enumerate(bookings):
+                        if b.get('id') == booking.get('id'):
+                            bookings[i]['notified_30m'] = True
+                            save_bookings(bookings)
+                            break
+            except Exception as e:
+                log_error(f"Ошибка проверки уведомления для брони {booking.get('id')}: {str(e)}", e)
+    except Exception as e:
+        log_error(f"Ошибка check_and_send_notifications: {str(e)}", e)
+
+def notification_worker():
+    """Фоновая задача для проверки уведомлений"""
+    while True:
+        try:
+            check_and_send_notifications()
+            # Проверяем каждые 5 минут
+            time.sleep(300)
+        except Exception as e:
+            log_error(f"Ошибка в notification_worker: {str(e)}", e)
+            time.sleep(60)
 
 # ====== FLASK И WEBHOOK ==================================================
 
@@ -1717,6 +1955,14 @@ if __name__ == "__main__":
     log_info("✨ С полной поддержкой фискализации через ЮKassa")
     log_info(f"☎️ Контакт: {STUDIO_CONTACT}")
     log_info(f"📍 Telegram: {STUDIO_TELEGRAM}")
+    if ADMIN_CHAT_ID > 0:
+        log_info(f"👨‍💼 Админ-панель активна (ID: {ADMIN_CHAT_ID})")
+        # Запускаем фоновый поток для уведомлений
+        notification_thread = threading.Thread(target=notification_worker, daemon=True)
+        notification_thread.start()
+        log_info("🔔 Система уведомлений запущена")
+    else:
+        log_info("⚠️ ADMIN_CHAT_ID не установлен - админ-панель недоступна")
     log_info("=" * 60)
     
     if not YOOKASSA_SHOP_ID or not YOOKASSA_SECRET_KEY:
