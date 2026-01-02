@@ -747,22 +747,36 @@ def show_prices(m):
 @bot.message_handler(func=lambda m: m.text == "📍 Контакты")
 def location(m):
     """Показ локации"""
-    chat_id = m.chat.id
-    kb = types.InlineKeyboardMarkup(row_width=1)
-    kb.add(types.InlineKeyboardButton("🗺️ Яндекс.Карты", url="https://maps.yandex.ru/?text=MACHATA+studio"))
-    kb.add(types.InlineKeyboardButton("🗺️ 2ГИС", url="https://2gis.ru/moscow/search/MACHATA"))
-    kb.add(types.InlineKeyboardButton("💬 Telegram: @saxaffon", url=f"https://t.me/{STUDIO_TELEGRAM.replace('@', '')}"))
-    kb.add(types.InlineKeyboardButton("💬 Telegram: @majesticbudan", url=f"https://t.me/{STUDIO_TELEGRAM_ALT.replace('@', '')}"))
-    phone_clean = STUDIO_CONTACT.replace(' ', '').replace('(', '').replace(')', '').replace('-', '').replace('+', '')
-    if not phone_clean.startswith('+'):
-        phone_clean = '+' + phone_clean
-    kb.add(types.InlineKeyboardButton("☎️ Позвонить: +7 (929) 909-09-89", url=f"tel:{phone_clean}"))
-    phone_alt_clean = STUDIO_CONTACT_ALT.replace(' ', '').replace('(', '').replace(')', '').replace('-', '').replace('+', '')
-    if not phone_alt_clean.startswith('+'):
-        phone_alt_clean = '+' + phone_alt_clean
-    kb.add(types.InlineKeyboardButton("☎️ Позвонить: +7 (977) 777-78-27", url=f"tel:{phone_alt_clean}"))
-    
-    bot.send_message(chat_id, format_location(), reply_markup=kb, parse_mode='HTML')
+    try:
+        chat_id = m.chat.id
+        log_info(f"Обработка кнопки 'Контакты' от пользователя {chat_id}")
+        
+        kb = types.InlineKeyboardMarkup(row_width=1)
+        kb.add(types.InlineKeyboardButton("🗺️ Яндекс.Карты", url="https://maps.yandex.ru/?text=MACHATA+studio"))
+        kb.add(types.InlineKeyboardButton("🗺️ 2ГИС", url="https://2gis.ru/moscow/search/MACHATA"))
+        kb.add(types.InlineKeyboardButton("💬 Telegram: @saxaffon", url=f"https://t.me/{STUDIO_TELEGRAM.replace('@', '')}"))
+        kb.add(types.InlineKeyboardButton("💬 Telegram: @majesticbudan", url=f"https://t.me/{STUDIO_TELEGRAM_ALT.replace('@', '')}"))
+        
+        phone_clean = STUDIO_CONTACT.replace(' ', '').replace('(', '').replace(')', '').replace('-', '').replace('+', '')
+        if not phone_clean.startswith('+'):
+            phone_clean = '+' + phone_clean
+        kb.add(types.InlineKeyboardButton("☎️ Позвонить: +7 (929) 909-09-89", url=f"tel:{phone_clean}"))
+        
+        phone_alt_clean = STUDIO_CONTACT_ALT.replace(' ', '').replace('(', '').replace(')', '').replace('-', '').replace('+', '')
+        if not phone_alt_clean.startswith('+'):
+            phone_alt_clean = '+' + phone_alt_clean
+        kb.add(types.InlineKeyboardButton("☎️ Позвонить: +7 (977) 777-78-27", url=f"tel:{phone_alt_clean}"))
+        
+        location_text = format_location()
+        log_info(f"Отправка контактов пользователю {chat_id}")
+        bot.send_message(chat_id, location_text, reply_markup=kb, parse_mode='HTML')
+        log_info(f"Контакты успешно отправлены пользователю {chat_id}")
+    except Exception as e:
+        log_error(f"Ошибка в функции location: {str(e)}", e)
+        try:
+            bot.send_message(m.chat.id, "❌ <b>Ошибка при загрузке контактов</b>\n\nПопробуй ещё раз или напиши нам напрямую.", parse_mode='HTML')
+        except:
+            pass
 
 @bot.message_handler(func=lambda m: m.text == "💬 Поддержка")
 def live_chat(m):
