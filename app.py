@@ -876,16 +876,15 @@ def webhook():
 # ====== ЮКАССА WEBHOOK ==============================================
 @app.route("/yookassa/webhook", methods=["POST"])
 def yookassa_webhook():
-        try:
-                    json_data = request.get_json()
+    try:
+        json_data = request.get_json()
         log_info("ЮКасса webhook получен")
-                # TODO: Обработка платежа ЮКасса
-                # После успешной оплаты обновить статус брони
-               return "ok", 200
+        # TODO: Обработка платежа ЮКасса
+        # После успешной оплаты обновить статус брони
+        return "ok", 200
     except Exception as e:
         log_error(f"yookassa_webhook: {str(e)}", e)
         return "error", 500
-
 # ====== ТОЧКА ВХОДА ==================================================
 if __name__ == "__main__":
     log_info("=" * 60)
