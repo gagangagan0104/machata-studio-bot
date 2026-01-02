@@ -880,8 +880,8 @@ def yookassa_webhook():
                     json_data = request.get_json()
                     log_info(f"ЮКасса webhook получен: {json_data.get('event') if json_data else 'empty'}")
 
-        # TODO: Обработка платежа ЮКасса
-        # После успешной оплаты обновить статус брони
+                # TODO: Обработка платежа ЮКасса
+                # После успешной оплаты обновить статус брони
 
         return "ok", 200
     except Exception as e:
