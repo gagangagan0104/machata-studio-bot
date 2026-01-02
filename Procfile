@@ -1,1 +1,1 @@
-web: python machata_bot.py
+web: python app.py
