@@ -33,6 +33,7 @@ STUDIO_TELEGRAM = "@majesticbudan"
 STUDIO_EMAIL = "hello@machata.studio"
 
 # Администратор (ID чата для уведомлений и админ-панели)
+# Можно установить через переменную окружения ADMIN_CHAT_ID или через команду /admin
 ADMIN_CHAT_ID = int(os.environ.get("ADMIN_CHAT_ID", "0"))  # Установите свой chat_id через переменную окружения
 
 # VIP пользователи
@@ -542,6 +543,78 @@ def send_welcome(m):
         )
     except Exception as e:
         log_error(f"send_welcome: {str(e)}", e)
+
+@bot.message_handler(commands=['admin'])
+def admin_command(m):
+    """Команда для настройки администратора"""
+    global ADMIN_CHAT_ID
+    chat_id = m.chat.id
+    
+    # Показываем текущий chat_id
+    text = f"""👨‍💼 <b>АДМИН-ПАНЕЛЬ</b>
+
+<b>Твой Chat ID:</b> <code>{chat_id}</code>
+
+<b>Текущий ADMIN_CHAT_ID:</b> <code>{ADMIN_CHAT_ID}</code>
+
+"""
+    
+    if ADMIN_CHAT_ID == 0:
+        text += """⚠️ <b>Админ-панель не настроена</b>
+
+<b>Чтобы активировать админ-панель:</b>
+
+1️⃣ <b>Способ 1 (рекомендуется):</b>
+   Добавь переменную окружения на Railway/Render:
+   <code>ADMIN_CHAT_ID={chat_id}</code>
+   
+   Затем перезапусти бота.
+
+2️⃣ <b>Способ 2 (временный):</b>
+   Напиши: <code>/setadmin</code>
+   ⚠️ Это установит тебя как админа до перезапуска бота."""
+    elif ADMIN_CHAT_ID == chat_id:
+        text += f"""✅ <b>Ты администратор!</b>
+
+Админ-панель должна быть видна в главном меню.
+Если не видишь кнопку "👨‍💼 Админ-панель", отправь /start"""
+    else:
+        text += f"""❌ <b>Ты не администратор</b>
+
+Текущий администратор: <code>{ADMIN_CHAT_ID}</code>
+Твой ID: <code>{chat_id}</code>"""
+    
+    bot.send_message(chat_id, text, parse_mode='HTML')
+
+@bot.message_handler(commands=['setadmin'])
+def set_admin(m):
+    """Временная установка администратора (до перезапуска)"""
+    global ADMIN_CHAT_ID
+    chat_id = m.chat.id
+    
+    old_admin = ADMIN_CHAT_ID
+    ADMIN_CHAT_ID = chat_id
+    
+    text = f"""✅ <b>Администратор установлен!</b>
+
+<b>Твой Chat ID:</b> <code>{chat_id}</code>
+<b>Предыдущий админ:</b> <code>{old_admin}</code>
+
+⚠️ <b>Внимание:</b> Это временная настройка!
+После перезапуска бота настройка сбросится.
+
+<b>Для постоянной настройки:</b>
+Добавь переменную окружения:
+<code>ADMIN_CHAT_ID={chat_id}</code>
+
+Отправь /start чтобы увидеть админ-панель в меню."""
+    
+    bot.send_message(chat_id, text, parse_mode='HTML')
+    
+    # Отправляем обновлённое меню с админ-панелью
+    bot.send_message(chat_id, "🏠 <b>ГЛАВНОЕ МЕНЮ</b>\n\n<b>🎵 Выбери действие:</b>", reply_markup=main_menu_keyboard(chat_id), parse_mode='HTML')
+    
+    log_info(f"Администратор установлен через команду: {chat_id} (было: {old_admin})")
 
 @bot.message_handler(func=lambda m: m.text == "🏠 Главное меню")
 def to_main_menu(m):
