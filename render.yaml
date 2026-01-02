@@ -1,9 +1,0 @@
-services:
-  - type: web
-    name: machata-bot
-    env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn -w 4 -b 0.0.0.0:$PORT --timeout 120 app:app
-    envVars:
-      - key: API_TOKEN
-        sync: false
