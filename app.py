@@ -878,8 +878,7 @@ def webhook():
 def yookassa_webhook():
         try:
                     json_data = request.get_json()
-                    log_info(f"ЮКасса webhook получен: {json_data.get('event') if json_data else 'empty'}")
-
+        log_info("ЮКасса webhook получен")
                 # TODO: Обработка платежа ЮКасса
                 # После успешной оплаты обновить статус брони
 
