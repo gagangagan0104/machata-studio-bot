@@ -82,20 +82,34 @@ def load_config():
     
     now = datetime.now()
     if _config_cache and _config_cache_time and (now - _config_cache_time).seconds < CACHE_TTL:
+        # Проверяем и исправляем цену репетиции в кэше
+        if _config_cache.get('prices', {}).get('repet') != 50:
+            log_info("Обнаружена неправильная цена репетиции в кэше, исправляем")
+            if 'prices' not in _config_cache:
+                _config_cache['prices'] = {}
+            _config_cache['prices']['repet'] = 50
         return _config_cache
     
     try:
         if os.path.exists(CONFIG_FILE):
             with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
                 data = json.load(f)
+                # Принудительно устанавливаем правильную цену репетиции
+                if 'prices' not in data:
+                    data['prices'] = {}
+                data['prices']['repet'] = 50
                 _config_cache = data
                 _config_cache_time = now
+                # Логируем загруженные цены для отладки
+                log_info(f"Конфиг загружен: repet={data.get('prices', {}).get('repet', 'N/A')}, studio={data.get('prices', {}).get('studio', 'N/A')}, full={data.get('prices', {}).get('full', 'N/A')}")
                 return data
         _config_cache = DEFAULT_CONFIG
         _config_cache_time = now
+        log_info(f"Используется DEFAULT_CONFIG: repet={DEFAULT_CONFIG.get('prices', {}).get('repet', 'N/A')}")
         return DEFAULT_CONFIG
     except Exception as e:
         log_error(f"load_config: {str(e)}", e)
+        log_info(f"Ошибка загрузки, используем DEFAULT_CONFIG: repet={DEFAULT_CONFIG.get('prices', {}).get('repet', 'N/A')}")
         return DEFAULT_CONFIG
 
 def load_bookings():
@@ -270,7 +284,13 @@ def times_keyboard(chat_id, date_str, service):
     
     if selected:
         start, end = min(selected), max(selected) + 1
-        base_price = config['prices'].get(service, 0) * len(selected)
+        # Принудительно используем правильные цены
+        if service == 'repet':
+            base_price = 50 * len(selected)  # Всегда 50 рублей за час репетиции
+        elif service == 'full':
+            base_price = config['prices'].get('full', 1500)
+        else:
+            base_price = config['prices'].get(service, 800) * len(selected)
         
         vip_discount = get_user_discount(chat_id)
         if vip_discount > 0:
@@ -332,11 +352,11 @@ def format_welcome(chat_id):
     if is_vip_user(chat_id):
         vip_name = VIP_USERS[chat_id]['name']
         vip_discount = VIP_USERS[chat_id]['discount']
-        vip_badge = f"\n\n╔═══════════════════════════╗\n║  👑 <b>VIP СТАТУС АКТИВЕН!</b>  ║\n╚═══════════════════════════╝\n\n🎁 <b>Привет, {vip_name}!</b>\n💎 Твоя персональная скидка: <b>{vip_discount}%</b> на всё!\n✨ Ты в приоритете при бронировании\n\n"
+        vip_badge = f"\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n👑 <b>VIP СТАТУС АКТИВЕН!</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n🎁 <b>Привет, {vip_name}!</b>\n💎 Твоя персональная скидка: <b>{vip_discount}%</b> на всё!\n✨ Ты в приоритете при бронировании\n\n"
     
-    return f"""╔═══════════════════════════════════╗
-║   🎵 <b>{STUDIO_NAME}</b>   ║
-╚═══════════════════════════════════╝
+    return f"""━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎵 <b>{STUDIO_NAME}</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 <b>🔥 Где рождается настоящая музыка</b>
 
@@ -382,11 +402,11 @@ def format_prices(chat_id):
     vip_info = ""
     if is_vip_user(chat_id):
         vip_discount = VIP_USERS[chat_id]['discount']
-        vip_info = f"\n\n╔═══════════════════════════════╗\n║  👑 <b>ТВОЙ VIP СТАТУС</b>  ║\n╚═══════════════════════════════╝\n\n💎 <b>Персональная скидка: {vip_discount}%</b> на все услуги!\n⭐ Приоритетное бронирование\n🎁 Эксклюзивные предложения\n\n"
+        vip_info = f"\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n👑 <b>ТВОЙ VIP СТАТУС</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n💎 <b>Персональная скидка: {vip_discount}%</b> на все услуги!\n⭐ Приоритетное бронирование\n🎁 Эксклюзивные предложения\n\n"
     
-    return f"""╔═══════════════════════════════════╗
-║     💰 <b>ТАРИФЫ {STUDIO_NAME}</b>     ║
-╚═══════════════════════════════════╝
+    return f"""━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💰 <b>ТАРИФЫ {STUDIO_NAME}</b>     
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 <b>🎯 ВЫБЕРИ СВОЙ ФОРМАТ:</b>
 
@@ -437,9 +457,9 @@ def format_prices(chat_id):
 
 def format_location():
     """Форматированная информация о локации"""
-    return f"""╔═══════════════════════════════════╗
-║   📍 <b>КАК НАС НАЙТИ</b>   ║
-╚═══════════════════════════════════╝
+    return f"""━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📍 <b>КАК НАС НАЙТИ</b>   
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 <b>🎵 {STUDIO_NAME}</b>
 
@@ -497,15 +517,15 @@ def to_main_menu(m):
     """Возврат в главное меню"""
     chat_id = m.chat.id
     user_states.pop(chat_id, None)
-    bot.send_message(chat_id, "╔═══════════════════════════════════╗\n║   🏠 <b>ГЛАВНОЕ МЕНЮ</b>   ║\n╚═══════════════════════════════════╝\n\n<b>🎵 Выбери действие:</b>", reply_markup=main_menu_keyboard(), parse_mode='HTML')
+    bot.send_message(chat_id, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🏠 <b>ГЛАВНОЕ МЕНЮ</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n<b>🎵 Выбери действие:</b>", reply_markup=main_menu_keyboard(), parse_mode='HTML')
 
 @bot.message_handler(func=lambda m: m.text == "🎙 Запись трека")
 def book_recording(m):
     """Бронирование записи"""
     chat_id = m.chat.id
-    text = """╔═══════════════════════════════════╗
-║     🎙 <b>ЗАПИСЬ В СТУДИИ</b>     ║
-╚═══════════════════════════════════╝
+    text = """━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎙 <b>ЗАПИСЬ В СТУДИИ</b>     
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 <b>✨ Профессиональная звукозапись мирового уровня</b>
 
@@ -533,9 +553,9 @@ def book_recording(m):
 def book_repet(m):
     """Бронирование репетиции"""
     chat_id = m.chat.id
-    text = """╔═══════════════════════════════════╗
-║   🎸 <b>РЕПЕТИЦИОННАЯ КОМНАТА</b>   ║
-╚═══════════════════════════════════╝
+    text = """━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎸 <b>РЕПЕТИЦИОННАЯ КОМНАТА</b>   
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 <b>🔥 Твоё идеальное место для творчества!</b>
 
@@ -580,7 +600,7 @@ def my_bookings(m):
     if not user_bookings:
         bot.send_message(
             chat_id,
-            "╔═══════════════════════════════════╗\n║   📭 <b>ПОКА НЕТ БРОНЕЙ</b>   ║\n╚═══════════════════════════════════╝\n\n🎵 <b>Создадим первую?</b>\n\n💡 Выбери услугу в главном меню и забронируй время!\n\n✨ После оплаты все твои брони будут здесь\n🎯 Управляй своими сеансами в одном месте",
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n📭 <b>ПОКА НЕТ БРОНЕЙ</b>   \n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n🎵 <b>Создадим первую?</b>\n\n💡 Выбери услугу в главном меню и забронируй время!\n\n✨ После оплаты все твои брони будут здесь\n🎯 Управляй своими сеансами в одном месте",
             reply_markup=main_menu_keyboard(),
             parse_mode='HTML'
         )
@@ -588,7 +608,7 @@ def my_bookings(m):
     
     kb = bookings_keyboard(bookings, chat_id)
     if kb:
-        bot.send_message(chat_id, "╔═══════════════════════════════════╗\n║   📋 <b>ТВОИ СЕАНСЫ</b>   ║\n╚═══════════════════════════════════╝\n\n👆 <b>Тапни на бронь для деталей:</b>", reply_markup=kb, parse_mode='HTML')
+        bot.send_message(chat_id, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n📋 <b>ТВОИ СЕАНСЫ</b>   \n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n👆 <b>Тапни на бронь для деталей:</b>", reply_markup=kb, parse_mode='HTML')
 
 @bot.message_handler(func=lambda m: m.text == "💰 Тарифы")
 def show_prices(m):
@@ -605,7 +625,7 @@ def location(m):
     kb.add(types.InlineKeyboardButton("🗺️ 2ГИС", url="https://2gis.ru/moscow/search/MACHATA"))
     
     bot.send_message(chat_id, format_location(), reply_markup=kb, parse_mode='HTML')
-    bot.send_message(chat_id, "╔═══════════════════════════════════╗\n║   🏠 <b>ГЛАВНОЕ МЕНЮ</b>   ║\n╚═══════════════════════════════════╝\n\n<b>🎵 Выбери действие:</b>", reply_markup=main_menu_keyboard(), parse_mode='HTML')
+    bot.send_message(chat_id, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🏠 <b>ГЛАВНОЕ МЕНЮ</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n<b>🎵 Выбери действие:</b>", reply_markup=main_menu_keyboard(), parse_mode='HTML')
 
 @bot.message_handler(func=lambda m: m.text == "💬 Поддержка")
 def live_chat(m):
@@ -614,9 +634,9 @@ def live_chat(m):
     kb = types.InlineKeyboardMarkup()
     kb.add(types.InlineKeyboardButton("📱 Telegram", url=f"https://t.me/{STUDIO_TELEGRAM.replace('@', '')}"))
     
-    text = f"""╔═══════════════════════════════════╗
-║   💬 <b>СВЯЖИСЬ С НАМИ</b>   ║
-╚═══════════════════════════════════╝
+    text = f"""━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💬 <b>СВЯЖИСЬ С НАМИ</b>   
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 <b>🔥 Мы всегда на связи!</b>
 
@@ -641,7 +661,7 @@ def live_chat(m):
 🎵 <b>Твоя музыка — наш приоритет!</b>"""
     
     bot.send_message(chat_id, text, reply_markup=kb, parse_mode='HTML')
-    bot.send_message(chat_id, "╔═══════════════════════════════════╗\n║   🏠 <b>ГЛАВНОЕ МЕНЮ</b>   ║\n╚═══════════════════════════════════╝\n\n<b>🎵 Выбери действие:</b>", reply_markup=main_menu_keyboard(), parse_mode='HTML')
+    bot.send_message(chat_id, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🏠 <b>ГЛАВНОЕ МЕНЮ</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n<b>🎵 Выбери действие:</b>", reply_markup=main_menu_keyboard(), parse_mode='HTML')
 
 # ====== CALLBACK ОБРАБОТЧИКИ ============================================
 
@@ -650,7 +670,7 @@ def cb_cancel(c):
     chat_id = c.message.chat.id
     user_states.pop(chat_id, None)
     bot.edit_message_text("❌ <b>Отменено</b>", chat_id, c.message.message_id, parse_mode='HTML')
-    bot.send_message(chat_id, "╔═══════════════════════════════════╗\n║   🏠 <b>ГЛАВНОЕ МЕНЮ</b>   ║\n╚═══════════════════════════════════╝\n\n<b>🎵 Выбери действие:</b>", reply_markup=main_menu_keyboard(), parse_mode='HTML')
+    bot.send_message(chat_id, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🏠 <b>ГЛАВНОЕ МЕНЮ</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n<b>🎵 Выбери действие:</b>", reply_markup=main_menu_keyboard(), parse_mode='HTML')
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("service_"))
 def cb_service(c):
@@ -664,9 +684,9 @@ def cb_service(c):
         'full': '✨ Студия со звукорежем',
     }
     
-    text = f"""╔═══════════════════════════════════╗
-║   🎵 <b>ШАГ 1/4: ВЫБОР ДАТЫ</b>   ║
-╚═══════════════════════════════════╝
+    text = f"""━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎵 <b>ШАГ 1/4: ВЫБОР ДАТЫ</b>   
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ✅ <b>{names.get(service, service)}</b> выбрана!
 
@@ -695,9 +715,9 @@ def cb_dates_page(c):
         'full': '✨ Студия со звукорежем',
     }
     
-    text = f"""╔═══════════════════════════════════╗
-║   🎵 <b>ШАГ 1/4: ВЫБОР ДАТЫ</b>   ║
-╚═══════════════════════════════════╝
+    text = f"""━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎵 <b>ШАГ 1/4: ВЫБОР ДАТЫ</b>   
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ✅ <b>{names.get(state['service'], state['service'])}</b> выбрана!
 
@@ -727,9 +747,9 @@ def cb_date(c):
     d = datetime.strptime(date_str, "%Y-%m-%d")
     df = d.strftime("%d.%m.%Y")
     
-    text = f"""╔═══════════════════════════════════╗
-║   🎵 <b>ШАГ 2/4: ВЫБОР ВРЕМЕНИ</b>   ║
-╚═══════════════════════════════════╝
+    text = f"""━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎵 <b>ШАГ 2/4: ВЫБОР ВРЕМЕНИ</b>   
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 📅 <b>Дата:</b> {df}
 
@@ -765,9 +785,9 @@ def cb_add_time(c):
     sel = state['selected_times']
     start, end = min(sel), max(sel) + 1
     
-    text = f"""╔═══════════════════════════════════╗
-║   🎵 <b>ШАГ 2/4: ВЫБОР ВРЕМЕНИ</b>   ║
-╚═══════════════════════════════════╝
+    text = f"""━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎵 <b>ШАГ 2/4: ВЫБОР ВРЕМЕНИ</b>   
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 📅 <b>Дата:</b> {df}
 ⏰ <b>Выбрано:</b> {len(sel)} ч ({start:02d}:00 – {end:02d}:00)
@@ -797,9 +817,9 @@ def cb_del_time(c):
     
     if sel:
         start, end = min(sel), max(sel) + 1
-        text = f"""╔═══════════════════════════════════╗
-║   🎵 <b>ШАГ 2/4: ВЫБОР ВРЕМЕНИ</b>   ║
-╚═══════════════════════════════════╝
+        text = f"""━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎵 <b>ШАГ 2/4: ВЫБОР ВРЕМЕНИ</b>   
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 📅 <b>Дата:</b> {df}
 ⏰ <b>Выбрано:</b> {len(sel)} ч ({start:02d}:00 – {end:02d}:00)
@@ -810,9 +830,9 @@ def cb_del_time(c):
 
 🎯 <b>Чем больше часов — тем больше скидка!</b>"""
     else:
-        text = f"""╔═══════════════════════════════════╗
-║   🎵 <b>ШАГ 2/4: ВЫБОР ВРЕМЕНИ</b>   ║
-╚═══════════════════════════════════╝
+        text = f"""━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎵 <b>ШАГ 2/4: ВЫБОР ВРЕМЕНИ</b>   
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 📅 <b>Дата:</b> {df}
 
@@ -843,9 +863,9 @@ def cb_clear_times(c):
     d = datetime.strptime(state['date'], "%Y-%m-%d")
     df = d.strftime("%d.%m.%Y")
     
-    text = f"""╔═══════════════════════════════════╗
-║   🎵 <b>ШАГ 2/4: ВЫБОР ВРЕМЕНИ</b>   ║
-╚═══════════════════════════════════╝
+    text = f"""━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎵 <b>ШАГ 2/4: ВЫБОР ВРЕМЕНИ</b>   
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 📅 <b>Дата:</b> {df}
 
@@ -885,9 +905,9 @@ def cb_back_to_date(c):
         'full': '✨ Студия со звукорежем',
     }
     
-    text = f"""╔═══════════════════════════════════╗
-║   🎵 <b>ШАГ 1/4: ВЫБОР ДАТЫ</b>   ║
-╚═══════════════════════════════════╝
+    text = f"""━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎵 <b>ШАГ 1/4: ВЫБОР ДАТЫ</b>   
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ✅ <b>{names.get(state['service'], state['service'])}</b> выбрана!
 
@@ -909,9 +929,9 @@ def cb_back_to_service(c):
     user_states[chat_id] = {'step': 'service', 'type': service_type, 'selected_times': []}
     
     if service_type == 'recording':
-        text = """╔═══════════════════════════════════╗
-║     🎙 <b>ЗАПИСЬ В СТУДИИ</b>     ║
-╚═══════════════════════════════════╝
+        text = """━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎙 <b>ЗАПИСЬ В СТУДИИ</b>     
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 <b>✨ Профессиональная звукозапись мирового уровня</b>
 
@@ -933,9 +953,9 @@ def cb_back_to_service(c):
 <b>💎 Выбери свой формат записи:</b>"""
         kb = service_keyboard("recording")
     else:
-        text = """╔═══════════════════════════════════╗
-║   🎸 <b>РЕПЕТИЦИОННАЯ КОМНАТА</b>   ║
-╚═══════════════════════════════════╝
+        text = """━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎸 <b>РЕПЕТИЦИОННАЯ КОМНАТА</b>   
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 <b>🔥 Твоё идеальное место для творчества!</b>
 
@@ -970,9 +990,9 @@ def cb_confirm_times(c):
     
     state['step'] = 'name'
     
-    text = """╔═══════════════════════════════════╗
-║   🎵 <b>ШАГ 3/4: КОНТАКТНЫЕ ДАННЫЕ</b>   ║
-╚═══════════════════════════════════╝
+    text = """━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎵 <b>ШАГ 3/4: КОНТАКТНЫЕ ДАННЫЕ</b>   
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 👤 <b>Как к тебе обращаться?</b>
 
@@ -986,7 +1006,7 @@ def cb_confirm_times(c):
 🎯 <b>Введи ниже:</b>"""
     
     bot.edit_message_text(text, chat_id, c.message.message_id, parse_mode='HTML')
-    bot.send_message(chat_id, "╔═══════════════════════════════════╗\n║   👤 <b>ТВОЁ ИМЯ</b>   ║\n╚═══════════════════════════════════╝\n\n💡 <b>Как к тебе обращаться?</b>\n\n🎯 Можешь указать:\n   • Имя\n   • Никнейм\n   • Название проекта/группы\n\n<b>Введи ниже:</b>", reply_markup=cancel_keyboard(), parse_mode='HTML')
+    bot.send_message(chat_id, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 <b>ТВОЁ ИМЯ</b>   \n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n💡 <b>Как к тебе обращаться?</b>\n\n🎯 Можешь указать:\n   • Имя\n   • Никнейм\n   • Название проекта/группы\n\n<b>Введи ниже:</b>", reply_markup=cancel_keyboard(), parse_mode='HTML')
 
 @bot.callback_query_handler(func=lambda c: c.data == "skip")
 def cb_skip(c):
@@ -1006,7 +1026,7 @@ def process_name(m):
     
     bot.send_message(
         chat_id,
-        "╔═══════════════════════════════════╗\n║   📧 <b>ТВОЙ EMAIL</b>   ║\n╚═══════════════════════════════════╝\n\n✉️ <b>На него отправим чек об оплате</b>\n\n🔒 <b>Безопасность:</b>\n   • Данные защищены\n   • Используются только для чека\n   • Не передаём третьим лицам\n\n<b>Введи email ниже:</b>",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n📧 <b>ТВОЙ EMAIL</b>   \n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n✉️ <b>На него отправим чек об оплате</b>\n\n🔒 <b>Безопасность:</b>\n   • Данные защищены\n   • Используются только для чека\n   • Не передаём третьим лицам\n\n<b>Введи email ниже:</b>",
         reply_markup=cancel_keyboard(),
         parse_mode='HTML'
     )
@@ -1024,7 +1044,7 @@ def process_email(m):
     if not re.match(email_pattern, email):
         bot.send_message(
             chat_id,
-            "╔═══════════════════════════════════╗\n║   ⚠️ <b>ОШИБКА EMAIL</b>   ║\n╚═══════════════════════════════════╝\n\n❌ <b>Некорректный email</b>\n\n💡 <b>Пожалуйста, проверь формат:</b>\n   Пример: <code>name@example.com</code>\n\n📧 <b>Email нужен для отправки чека об оплате</b>\n\n<b>Попробуй ещё раз:</b>",
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n⚠️ <b>ОШИБКА EMAIL</b>   \n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n❌ <b>Некорректный email</b>\n\n💡 <b>Пожалуйста, проверь формат:</b>\n   Пример: <code>name@example.com</code>\n\n📧 <b>Email нужен для отправки чека об оплате</b>\n\n<b>Попробуй ещё раз:</b>",
             reply_markup=cancel_keyboard(),
             parse_mode='HTML'
         )
@@ -1035,7 +1055,7 @@ def process_email(m):
     
     bot.send_message(
         chat_id,
-        "╔═══════════════════════════════════╗\n║   ☎️ <b>ТВОЙ ТЕЛЕФОН</b>   ║\n╚═══════════════════════════════════╝\n\n📞 <b>Нужен для связи и подтверждения брони</b>\n\n💡 <b>Примеры формата:</b>\n   • <code>+7 (999) 000-00-00</code>\n   • <code>79990000000</code>\n\n🔒 <b>Безопасность:</b> Данные защищены\n\n<b>Введи номер ниже:</b>",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n☎️ <b>ТВОЙ ТЕЛЕФОН</b>   \n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n📞 <b>Нужен для связи и подтверждения брони</b>\n\n💡 <b>Примеры формата:</b>\n   • <code>+7 (999) 000-00-00</code>\n   • <code>79990000000</code>\n\n🔒 <b>Безопасность:</b> Данные защищены\n\n<b>Введи номер ниже:</b>",
         reply_markup=cancel_keyboard(),
         parse_mode='HTML'
     )
@@ -1053,7 +1073,7 @@ def process_phone(m):
     if len(phone_digits) != 11:
         bot.send_message(
             chat_id,
-            "╔═══════════════════════════════════╗\n║   ⚠️ <b>ОШИБКА ТЕЛЕФОНА</b>   ║\n╚═══════════════════════════════════╝\n\n❌ <b>Номер должен содержать 11 цифр</b>\n\n💡 <b>Правильные форматы:</b>\n   • <code>+7 (999) 000-00-00</code>\n   • <code>79990000000</code>\n\n<b>Попробуй ещё раз:</b>",
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n⚠️ <b>ОШИБКА ТЕЛЕФОНА</b>   \n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n❌ <b>Номер должен содержать 11 цифр</b>\n\n💡 <b>Правильные форматы:</b>\n   • <code>+7 (999) 000-00-00</code>\n   • <code>79990000000</code>\n\n<b>Попробуй ещё раз:</b>",
             reply_markup=cancel_keyboard(),
             parse_mode='HTML'
         )
@@ -1069,7 +1089,7 @@ def process_phone(m):
     
     bot.send_message(
         chat_id,
-        "╔═══════════════════════════════════╗\n║   💬 <b>КОММЕНТАРИЙ</b>   ║\n╚═══════════════════════════════════╝\n\n🎵 <b>Что записываешь или репетируешь?</b>\n\n💡 <b>Расскажи о своём проекте:</b>\n   • Название группы/проекта\n   • Стиль музыки\n   • Особые пожелания\n\n✨ <b>Это поможет нам лучше подготовиться!</b>\n\n⏭️ <b>Или просто пропусти</b>",
+        "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n💬 <b>КОММЕНТАРИЙ</b>   \n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n🎵 <b>Что записываешь или репетируешь?</b>\n\n💡 <b>Расскажи о своём проекте:</b>\n   • Название группы/проекта\n   • Стиль музыки\n   • Особые пожелания\n\n✨ <b>Это поможет нам лучше подготовиться!</b>\n\n⏭️ <b>Или просто пропусти</b>",
         reply_markup=kb,
         parse_mode='HTML'
     )
@@ -1204,7 +1224,7 @@ def complete_booking(chat_id):
     try:
         state = user_states.get(chat_id)
         if not state:
-            bot.send_message(chat_id, "╔═══════════════════════════════════╗\n║   ⚠️ <b>ОШИБКА</b>   ║\n╚═══════════════════════════════════╝\n\n❌ <b>Состояние потеряно</b>\n\n💡 <b>Не переживай! Просто начни заново:</b>\n\n🎯 Выбери услугу в главном меню\n\n<b>🎵 Всё будет хорошо!</b>", reply_markup=main_menu_keyboard(), parse_mode='HTML')
+            bot.send_message(chat_id, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n⚠️ <b>ОШИБКА</b>   \n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n❌ <b>Состояние потеряно</b>\n\n💡 <b>Не переживай! Просто начни заново:</b>\n\n🎯 Выбери услугу в главном меню\n\n<b>🎵 Всё будет хорошо!</b>", reply_markup=main_menu_keyboard(), parse_mode='HTML')
             return
         
         if not YOOKASSA_SHOP_ID or not YOOKASSA_SECRET_KEY:
@@ -1229,10 +1249,20 @@ def complete_booking(chat_id):
         service = state.get('service', 'repet')
         duration = len(sel)
         
+        # Принудительно используем правильные цены
+        prices = config.get('prices', {})
         if service == 'full':
-            base_price = config['prices'].get('full', 1500)
+            base_price = prices.get('full', 1500)
+        elif service == 'repet':
+            # Принудительно 50 рублей за час репетиции
+            base_price = 50 * duration
+            log_info(f"Расчёт цены репетиции: 50₽ × {duration}ч = {base_price}₽")
+        elif service == 'studio':
+            base_price = prices.get('studio', 800) * duration
         else:
-            base_price = config['prices'].get(service, 50) * duration
+            base_price = prices.get(service, 50) * duration
+        
+        log_info(f"Расчёт цены: service={service}, duration={duration}, base_price={base_price}₽")
         
         price = base_price
         discount_text = ""
@@ -1317,7 +1347,7 @@ def complete_booking(chat_id):
         if not payment_result['success']:
             bot.send_message(
                 chat_id,
-                f"╔═══════════════════════════════════╗\n║   ⚠️ <b>ОШИБКА ОПЛАТЫ</b>   ║\n╚═══════════════════════════════════╝\n\n❌ <b>Не удалось создать платёж</b>\n\n💡 <b>Что делать:</b>\n   • Попробуй ещё раз через минуту\n   • Или свяжись с нами — мы поможем!\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n<b>📞 КОНТАКТЫ:</b>\n📱 <b>Telegram:</b> {STUDIO_TELEGRAM}\n☎️ <b>Телефон:</b> {STUDIO_CONTACT}\n\n<b>🎵 Мы всегда готовы помочь!</b>",
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n⚠️ <b>ОШИБКА ОПЛАТЫ</b>   \n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n❌ <b>Не удалось создать платёж</b>\n\n💡 <b>Что делать:</b>\n   • Попробуй ещё раз через минуту\n   • Или свяжись с нами — мы поможем!\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n<b>📞 КОНТАКТЫ:</b>\n📱 <b>Telegram:</b> {STUDIO_TELEGRAM}\n☎️ <b>Телефон:</b> {STUDIO_CONTACT}\n\n<b>🎵 Мы всегда готовы помочь!</b>",
                 reply_markup=main_menu_keyboard(),
                 parse_mode='HTML'
             )
@@ -1336,9 +1366,9 @@ def complete_booking(chat_id):
         kb.add(types.InlineKeyboardButton("💳 Оплатить", url=payment_result['payment_url']))
         kb.add(types.InlineKeyboardButton("📋 Мои бронирования", callback_data="back_to_bookings"))
         
-        payment_message = f"""╔═══════════════════════════════════╗
-║   💳 <b>ОПЛАТА БРОНИРОВАНИЯ</b>   ║
-╚═══════════════════════════════════╝
+        payment_message = f"""━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💳 <b>ОПЛАТА БРОНИРОВАНИЯ</b>   
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 <b>🎵 Почти готово! Осталось оплатить</b>
 
@@ -1362,7 +1392,7 @@ def complete_booking(chat_id):
         log_error(f"complete_booking: {str(e)}", e)
         bot.send_message(
             chat_id,
-            f"╔═══════════════════════════════════╗\n║   ⚠️ <b>ОШИБКА</b>   ║\n╚═══════════════════════════════════╝\n\n❌ <b>Что-то пошло не так</b>\n\n💡 <b>Не переживай! Мы поможем:</b>\n\n📱 <b>Telegram:</b> {STUDIO_TELEGRAM}\n☎️ <b>Телефон:</b> {STUDIO_CONTACT}\n\n<b>🎵 Свяжись с нами — мы решим всё быстро!</b>",
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n⚠️ <b>ОШИБКА</b>   \n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n❌ <b>Что-то пошло не так</b>\n\n💡 <b>Не переживай! Мы поможем:</b>\n\n📱 <b>Telegram:</b> {STUDIO_TELEGRAM}\n☎️ <b>Телефон:</b> {STUDIO_CONTACT}\n\n<b>🎵 Свяжись с нами — мы решим всё быстро!</b>",
             parse_mode='HTML'
         )
 
@@ -1391,9 +1421,9 @@ def notify_payment_success(booking):
         else:
             t_str = "-"
         
-        text = f"""╔═══════════════════════════════════╗
-║   ✅ <b>ОПЛАТА ПОЛУЧЕНА!</b>   ║
-╚═══════════════════════════════════╝
+        text = f"""━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ <b>ОПЛАТА ПОЛУЧЕНА!</b>   
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 <b>🎉 Поздравляем! Твоя бронь подтверждена!</b>
 
@@ -1487,9 +1517,9 @@ def cb_booking_detail(c):
     # Если есть payment_url и статус awaiting_payment, показываем кнопку оплаты
     payment_url = booking.get('payment_url')
     
-    text = f"""╔═══════════════════════════════════╗
-║   📋 <b>ДЕТАЛИ СЕАНСА</b>   ║
-╚═══════════════════════════════════╝
+    text = f"""━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 <b>ДЕТАЛИ СЕАНСА</b>   
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 <b>{names.get(booking['service'], booking['service'])}</b>
 
@@ -1604,18 +1634,18 @@ def cb_cancel_booking_confirm(c):
             bot.answer_callback_query(c.id, "⚠️ Оплаченная бронь не может быть отменена автоматически")
             bot.send_message(
                 chat_id,
-                f"╔═══════════════════════════════════╗\n║   ⚠️ <b>БРОНЬ ОПЛАЧЕНА</b>   ║\n╚═══════════════════════════════════╝\n\n<b>Эта бронь уже оплачена.</b>\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n<b>📞 Для отмены свяжись с нами:</b>\n\n📱 <b>Telegram:</b> {STUDIO_TELEGRAM}\n☎️ <b>Телефон:</b> {STUDIO_CONTACT}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n💡 <b>Условия возврата:</b>\n   • Отмена менее чем за 24 часа → возврат 50%\n   • Отмена более чем за 24 часа → полный возврат\n\n<b>🎵 Мы всегда готовы помочь!</b>",
+                f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n⚠️ <b>БРОНЬ ОПЛАЧЕНА</b>   \n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n<b>Эта бронь уже оплачена.</b>\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n<b>📞 Для отмены свяжись с нами:</b>\n\n📱 <b>Telegram:</b> {STUDIO_TELEGRAM}\n☎️ <b>Телефон:</b> {STUDIO_CONTACT}\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n💡 <b>Условия возврата:</b>\n   • Отмена менее чем за 24 часа → возврат 50%\n   • Отмена более чем за 24 часа → полный возврат\n\n<b>🎵 Мы всегда готовы помочь!</b>",
                 reply_markup=main_menu_keyboard(),
                 parse_mode='HTML'
             )
         else:
             bot.answer_callback_query(c.id, "✅ Отменена")
             bot.edit_message_text(
-                "╔═══════════════════════════════════╗\n║   ✅ <b>БРОНЬ ОТМЕНЕНА</b>   ║\n╚═══════════════════════════════════╝\n\n<b>⏰ Время освобождено</b>\n\n🎵 <b>Можешь забронировать другое время</b>\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n<b>🙏 Спасибо, что уведомил нас!</b>\n\n💡 <b>Если передумаешь — мы всегда рады видеть тебя!</b>",
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n✅ <b>БРОНЬ ОТМЕНЕНА</b>   \n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n<b>⏰ Время освобождено</b>\n\n🎵 <b>Можешь забронировать другое время</b>\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n<b>🙏 Спасибо, что уведомил нас!</b>\n\n💡 <b>Если передумаешь — мы всегда рады видеть тебя!</b>",
                 chat_id, c.message.message_id,
                 parse_mode='HTML'
             )
-            bot.send_message(chat_id, "╔═══════════════════════════════════╗\n║   🏠 <b>ГЛАВНОЕ МЕНЮ</b>   ║\n╚═══════════════════════════════════╝\n\n<b>🎵 Выбери действие:</b>", reply_markup=main_menu_keyboard(), parse_mode='HTML')
+            bot.send_message(chat_id, "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🏠 <b>ГЛАВНОЕ МЕНЮ</b>\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n<b>🎵 Выбери действие:</b>", reply_markup=main_menu_keyboard(), parse_mode='HTML')
     else:
         bot.answer_callback_query(c.id, "❌ Ошибка при отмене")
 
