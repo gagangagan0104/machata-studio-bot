@@ -51,7 +51,7 @@ VIP_USERS = {
 # Конфигурация по умолчанию
 DEFAULT_CONFIG = {
     'prices': {
-        'repet': 50,
+        'repet': 700,
         'studio': 800,
         'full': 1500,
     },
@@ -93,11 +93,11 @@ def load_config():
     now = datetime.now()
     if _config_cache and _config_cache_time and (now - _config_cache_time).seconds < CACHE_TTL:
         # Проверяем и исправляем цену репетиции в кэше
-        if _config_cache.get('prices', {}).get('repet') != 50:
+        if _config_cache.get('prices', {}).get('repet') != 700:
             log_info("Обнаружена неправильная цена репетиции в кэше, исправляем")
             if 'prices' not in _config_cache:
                 _config_cache['prices'] = {}
-            _config_cache['prices']['repet'] = 50
+            _config_cache['prices']['repet'] = 700
         return _config_cache
     
     try:
@@ -107,7 +107,7 @@ def load_config():
                 # Принудительно устанавливаем правильную цену репетиции
                 if 'prices' not in data:
                     data['prices'] = {}
-                data['prices']['repet'] = 50
+                data['prices']['repet'] = 700
                 _config_cache = data
                 _config_cache_time = now
                 # Логируем загруженные цены для отладки
@@ -250,7 +250,7 @@ def service_keyboard(service_type):
             callback_data="service_full"))
     elif service_type == "repet":
         kb.add(types.InlineKeyboardButton(
-            "🎸 Репетиция — 50 ₽/ч",
+            "🎸 Репетиция — 700 ₽/ч",
             callback_data="service_repet"))
     
     kb.add(types.InlineKeyboardButton("❌ Отмена", callback_data="cancel"))
@@ -307,7 +307,7 @@ def times_keyboard(chat_id, date_str, service):
         start, end = min(selected), max(selected) + 1
         # Принудительно используем правильные цены
         if service == 'repet':
-            base_price = 50 * len(selected)  # Всегда 50 рублей за час репетиции
+            base_price = 700 * len(selected)  # 700 рублей за час репетиции
         elif service == 'full':
             base_price = config['prices'].get('full', 1500)
         else:
@@ -384,7 +384,7 @@ def format_welcome(chat_id):
 
 <b>🎯 ЧТО МЫ ПРЕДЛАГАЕМ:</b>
 
-<b>🎸 РЕПЕТИЦИЯ</b> — <b>50 ₽/час</b> ⚡
+<b>🎸 РЕПЕТИЦИЯ</b> — <b>700 ₽/час</b> ⚡
    🎤 Идеальная акустика для твоей музыки
    🎹 Все инструменты готовы к игре
    ☕ Кофе, чай, уют — всё включено
@@ -422,7 +422,7 @@ def format_prices(chat_id):
 <b>🎯 ВЫБЕРИ СВОЙ ФОРМАТ:</b>
 
 <b>🎸 РЕПЕТИЦИЯ</b>
-   <b>50 ₽/час</b> ⚡ Супер цена!
+   <b>700 ₽/час</b>
 
    🎤 Идеальная акустика для репетиций
    🎹 Все инструменты в наличии
@@ -1358,13 +1358,13 @@ def complete_booking(chat_id):
         if service == 'full':
             base_price = prices.get('full', 1500)
         elif service == 'repet':
-            # Принудительно 50 рублей за час репетиции
-            base_price = 50 * duration
-            log_info(f"Расчёт цены репетиции: 50₽ × {duration}ч = {base_price}₽")
+            # 700 рублей за час репетиции
+            base_price = 700 * duration
+            log_info(f"Расчёт цены репетиции: 700₽ × {duration}ч = {base_price}₽")
         elif service == 'studio':
             base_price = prices.get('studio', 800) * duration
         else:
-            base_price = prices.get(service, 50) * duration
+            base_price = prices.get(service, 700) * duration
         
         log_info(f"Расчёт цены: service={service}, duration={duration}, base_price={base_price}₽")
         
@@ -2130,7 +2130,7 @@ def yookassa_webhook():
             if not booking:
                 log_error(f"yookassa_webhook: бронь {booking_id} не найдена")
                 return "error", 404
-            
+        
             # Обновляем статус только если ещё не оплачена
             if booking.get('status') != 'paid':
                 log_info(f"Обновление статуса брони {booking_id} на 'paid' после успешной оплаты")
@@ -2238,7 +2238,7 @@ if __name__ == "__main__":
                 app.run(host="0.0.0.0", port=PORT, debug=False)
             except Exception as e:
                 log_error(f"Ошибка webhook: {str(e)}", e)
-            log_info("Переключаюсь на polling...")
+                log_info("Переключаюсь на polling...")
             try:
                 bot.infinity_polling()
             except Exception as e2:
