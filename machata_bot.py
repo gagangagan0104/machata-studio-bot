@@ -26,10 +26,12 @@ YOOKASSA_SECRET_KEY = os.environ.get("YOOKASSA_SECRET_KEY", "")
 STUDIO_NAME = "MACHATA studio"
 BOOKINGS_FILE = 'machata_bookings.json'
 CONFIG_FILE = 'machata_config.json'
-STUDIO_CONTACT = "+7 (977) 777-78-27"
+STUDIO_CONTACT = "79299090989"
+STUDIO_CONTACT_ALT = "+7 (977) 777-78-27"  # Дополнительный номер
 STUDIO_ADDRESS = "Москва, Загородное шоссе, 1 корпус 2"
 STUDIO_HOURS = "Пн–Пт 9:00–03:00 | Сб–Вс 09:00–09:00"
-STUDIO_TELEGRAM = "@majesticbudan"
+STUDIO_TELEGRAM = "@saxaffon"
+STUDIO_TELEGRAM_ALT = "@majesticbudan"  # Дополнительный Telegram
 STUDIO_EMAIL = "hello@machata.studio"
 
 # Администратор (ID чата для уведомлений и админ-панели)
@@ -458,6 +460,13 @@ def format_prices(chat_id):
 
 def format_location():
     """Форматированная информация о локации"""
+    # Форматируем номер телефона для отображения
+    phone_display = STUDIO_CONTACT
+    if len(phone_display) == 11 and phone_display.startswith('7'):
+        phone_display = f"+7 ({phone_display[1:4]}) {phone_display[4:7]}-{phone_display[7:9]}-{phone_display[9:11]}"
+    elif not phone_display.startswith('+'):
+        phone_display = '+' + phone_display
+    
     return f"""📍 <b>КАК НАС НАЙТИ</b>   
 
 <b>🎵 {STUDIO_NAME}</b>
@@ -470,9 +479,14 @@ def format_location():
 
 <b>📞 КОНТАКТЫ:</b>
 
-☎️ <b>Телефон:</b> {STUDIO_CONTACT}
+☎️ <b>Телефон:</b> {phone_display}
 📱 <b>Telegram:</b> {STUDIO_TELEGRAM}
 💌 <b>Email:</b> {STUDIO_EMAIL}
+
+<b>📞 ДОПОЛНИТЕЛЬНЫЕ КОНТАКТЫ:</b>
+
+☎️ <b>Телефон:</b> {STUDIO_CONTACT_ALT}
+📱 <b>Telegram:</b> {STUDIO_TELEGRAM_ALT}
 
 <b>🚗 УДОБСТВА:</b>
    🚗 Удобная парковка
@@ -734,26 +748,56 @@ def show_prices(m):
 def location(m):
     """Показ локации"""
     chat_id = m.chat.id
-    kb = types.InlineKeyboardMarkup()
+    kb = types.InlineKeyboardMarkup(row_width=1)
     kb.add(types.InlineKeyboardButton("🗺️ Яндекс.Карты", url="https://maps.yandex.ru/?text=MACHATA+studio"))
     kb.add(types.InlineKeyboardButton("🗺️ 2ГИС", url="https://2gis.ru/moscow/search/MACHATA"))
+    kb.add(types.InlineKeyboardButton("💬 Telegram: @saxaffon", url=f"https://t.me/{STUDIO_TELEGRAM.replace('@', '')}"))
+    kb.add(types.InlineKeyboardButton("💬 Telegram: @majesticbudan", url=f"https://t.me/{STUDIO_TELEGRAM_ALT.replace('@', '')}"))
+    phone_clean = STUDIO_CONTACT.replace(' ', '').replace('(', '').replace(')', '').replace('-', '').replace('+', '')
+    if not phone_clean.startswith('+'):
+        phone_clean = '+' + phone_clean
+    kb.add(types.InlineKeyboardButton("☎️ Позвонить: +7 (929) 909-09-89", url=f"tel:{phone_clean}"))
+    phone_alt_clean = STUDIO_CONTACT_ALT.replace(' ', '').replace('(', '').replace(')', '').replace('-', '').replace('+', '')
+    if not phone_alt_clean.startswith('+'):
+        phone_alt_clean = '+' + phone_alt_clean
+    kb.add(types.InlineKeyboardButton("☎️ Позвонить: +7 (977) 777-78-27", url=f"tel:{phone_alt_clean}"))
     
     bot.send_message(chat_id, format_location(), reply_markup=kb, parse_mode='HTML')
-    bot.send_message(chat_id, "🏠 <b>ГЛАВНОЕ МЕНЮ</b>\n\n<b>🎵 Выбери действие:</b>", reply_markup=main_menu_keyboard(chat_id), parse_mode='HTML')
 
 @bot.message_handler(func=lambda m: m.text == "💬 Поддержка")
 def live_chat(m):
     """Поддержка"""
     chat_id = m.chat.id
-    kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton("📱 Telegram", url=f"https://t.me/{STUDIO_TELEGRAM.replace('@', '')}"))
+    kb = types.InlineKeyboardMarkup(row_width=1)
+    kb.add(types.InlineKeyboardButton("💬 Telegram: @saxaffon", url=f"https://t.me/{STUDIO_TELEGRAM.replace('@', '')}"))
+    kb.add(types.InlineKeyboardButton("💬 Telegram: @majesticbudan", url=f"https://t.me/{STUDIO_TELEGRAM_ALT.replace('@', '')}"))
+    phone_clean = STUDIO_CONTACT.replace(' ', '').replace('(', '').replace(')', '').replace('-', '').replace('+', '')
+    if not phone_clean.startswith('+'):
+        phone_clean = '+' + phone_clean
+    kb.add(types.InlineKeyboardButton("☎️ Позвонить: +7 (929) 909-09-89", url=f"tel:{phone_clean}"))
+    phone_alt_clean = STUDIO_CONTACT_ALT.replace(' ', '').replace('(', '').replace(')', '').replace('-', '').replace('+', '')
+    if not phone_alt_clean.startswith('+'):
+        phone_alt_clean = '+' + phone_alt_clean
+    kb.add(types.InlineKeyboardButton("☎️ Позвонить: +7 (977) 777-78-27", url=f"tel:{phone_alt_clean}"))
+    
+    # Форматируем номер для отображения
+    phone_display = STUDIO_CONTACT
+    if len(phone_display) == 11 and phone_display.startswith('7'):
+        phone_display = f"+7 ({phone_display[1:4]}) {phone_display[4:7]}-{phone_display[7:9]}-{phone_display[9:11]}"
+    elif not phone_display.startswith('+'):
+        phone_display = '+' + phone_display
     
     text = f"""💬 <b>СВЯЖИСЬ С НАМИ</b>   
 
 <b>🔥 Мы всегда на связи!</b>
 
+<b>📞 ОСНОВНЫЕ КОНТАКТЫ:</b>
 📱 <b>Telegram:</b> {STUDIO_TELEGRAM}
-☎️ <b>Телефон:</b> {STUDIO_CONTACT}
+☎️ <b>Телефон:</b> {phone_display}
+
+<b>📞 ДОПОЛНИТЕЛЬНЫЕ КОНТАКТЫ:</b>
+📱 <b>Telegram:</b> {STUDIO_TELEGRAM_ALT}
+☎️ <b>Телефон:</b> {STUDIO_CONTACT_ALT}
 💌 <b>Email:</b> {STUDIO_EMAIL}
 
 <b>⚡ ЧТО ТЫ ПОЛУЧАЕШЬ:</b>
@@ -1461,7 +1505,7 @@ def complete_booking(chat_id):
         if not payment_result['success']:
             bot.send_message(
                 chat_id,
-                f"\n⚠️ <b>ОШИБКА ОПЛАТЫ</b>   \n\n\n❌ <b>Не удалось создать платёж</b>\n\n💡 <b>Что делать:</b>\n   • Попробуй ещё раз через минуту\n   • Или свяжись с нами — мы поможем!\n\n\n\n<b>📞 КОНТАКТЫ:</b>\n📱 <b>Telegram:</b> {STUDIO_TELEGRAM}\n☎️ <b>Телефон:</b> {STUDIO_CONTACT}\n\n<b>🎵 Мы всегда готовы помочь!</b>",
+                f"\n⚠️ <b>ОШИБКА ОПЛАТЫ</b>   \n\n\n❌ <b>Не удалось создать платёж</b>\n\n💡 <b>Что делать:</b>\n   • Попробуй ещё раз через минуту\n   • Или свяжись с нами — мы поможем!\n\n\n\n<b>📞 КОНТАКТЫ:</b>\n📱 <b>Telegram:</b> {STUDIO_TELEGRAM}\n☎️ <b>Телефон:</b> +{STUDIO_CONTACT}\n\n<b>🎵 Мы всегда готовы помочь!</b>",
                 reply_markup=main_menu_keyboard(chat_id),
                 parse_mode='HTML'
             )
@@ -1503,7 +1547,7 @@ def complete_booking(chat_id):
         log_error(f"complete_booking: {str(e)}", e)
         bot.send_message(
             chat_id,
-            f"\n⚠️ <b>ОШИБКА</b>   \n\n\n❌ <b>Что-то пошло не так</b>\n\n💡 <b>Не переживай! Мы поможем:</b>\n\n📱 <b>Telegram:</b> {STUDIO_TELEGRAM}\n☎️ <b>Телефон:</b> {STUDIO_CONTACT}\n\n<b>🎵 Свяжись с нами — мы решим всё быстро!</b>",
+            f"\n⚠️ <b>ОШИБКА</b>   \n\n\n❌ <b>Что-то пошло не так</b>\n\n💡 <b>Не переживай! Мы поможем:</b>\n\n📱 <b>Telegram:</b> {STUDIO_TELEGRAM}\n☎️ <b>Телефон:</b> +{STUDIO_CONTACT}\n\n<b>🎵 Свяжись с нами — мы решим всё быстро!</b>",
             parse_mode='HTML'
         )
 
@@ -1803,7 +1847,7 @@ def cb_cancel_booking_confirm(c):
             bot.answer_callback_query(c.id, "⚠️ Оплаченная бронь не может быть отменена автоматически")
             bot.send_message(
                 chat_id,
-                f"\n⚠️ <b>БРОНЬ ОПЛАЧЕНА</b>   \n\n\n<b>Эта бронь уже оплачена.</b>\n\n\n\n<b>📞 Для отмены свяжись с нами:</b>\n\n📱 <b>Telegram:</b> {STUDIO_TELEGRAM}\n☎️ <b>Телефон:</b> {STUDIO_CONTACT}\n\n\n\n💡 <b>Условия возврата:</b>\n   • Отмена менее чем за 24 часа → возврат 50%\n   • Отмена более чем за 24 часа → полный возврат\n\n<b>🎵 Мы всегда готовы помочь!</b>",
+                f"\n⚠️ <b>БРОНЬ ОПЛАЧЕНА</b>   \n\n\n<b>Эта бронь уже оплачена.</b>\n\n\n\n<b>📞 Для отмены свяжись с нами:</b>\n\n📱 <b>Telegram:</b> {STUDIO_TELEGRAM}\n☎️ <b>Телефон:</b> +{STUDIO_CONTACT}\n\n\n\n💡 <b>Условия возврата:</b>\n   • Отмена менее чем за 24 часа → возврат 50%\n   • Отмена более чем за 24 часа → полный возврат\n\n<b>🎵 Мы всегда готовы помочь!</b>",
                 reply_markup=main_menu_keyboard(chat_id),
                 parse_mode='HTML'
             )
@@ -1829,25 +1873,27 @@ def cb_back_to_bookings(c):
 
 @bot.callback_query_handler(func=lambda c: c.data == "show_location_after_payment")
 def cb_show_location_after_payment(c):
-    """Показ локации после оплаты"""
+    """Показ контактов после оплаты - сразу переводим на вкладку КОНТАКТЫ"""
     chat_id = c.message.chat.id
+    bot.answer_callback_query(c.id, "📍 Контакты")
     
-    # Добавляем кнопки для связи
+    # Отправляем контакты как новое сообщение (более надёжно)
     kb = types.InlineKeyboardMarkup(row_width=1)
     kb.add(types.InlineKeyboardButton("🗺️ Яндекс.Карты", url="https://maps.yandex.ru/?text=MACHATA+studio"))
     kb.add(types.InlineKeyboardButton("🗺️ 2ГИС", url="https://2gis.ru/moscow/search/MACHATA"))
-    kb.add(types.InlineKeyboardButton("💬 Написать в Telegram", url=f"https://t.me/{STUDIO_TELEGRAM.replace('@', '')}"))
+    kb.add(types.InlineKeyboardButton("💬 Telegram: @saxaffon", url=f"https://t.me/{STUDIO_TELEGRAM.replace('@', '')}"))
+    kb.add(types.InlineKeyboardButton("💬 Telegram: @majesticbudan", url=f"https://t.me/{STUDIO_TELEGRAM_ALT.replace('@', '')}"))
     phone_clean = STUDIO_CONTACT.replace(' ', '').replace('(', '').replace(')', '').replace('-', '').replace('+', '')
-    kb.add(types.InlineKeyboardButton("☎️ Позвонить", url=f"tel:+{phone_clean}"))
+    if not phone_clean.startswith('+'):
+        phone_clean = '+' + phone_clean
+    kb.add(types.InlineKeyboardButton("☎️ Позвонить: +7 (929) 909-09-89", url=f"tel:{phone_clean}"))
+    phone_alt_clean = STUDIO_CONTACT_ALT.replace(' ', '').replace('(', '').replace(')', '').replace('-', '').replace('+', '')
+    if not phone_alt_clean.startswith('+'):
+        phone_alt_clean = '+' + phone_alt_clean
+    kb.add(types.InlineKeyboardButton("☎️ Позвонить: +7 (977) 777-78-27", url=f"tel:{phone_alt_clean}"))
     kb.add(types.InlineKeyboardButton("🏠 Главное меню", callback_data="back_to_main_after_payment"))
     
-    bot.edit_message_text(
-        format_location(),
-        chat_id,
-        c.message.message_id,
-        reply_markup=kb,
-        parse_mode='HTML'
-    )
+    bot.send_message(chat_id, format_location(), reply_markup=kb, parse_mode='HTML')
 
 @bot.callback_query_handler(func=lambda c: c.data == "back_to_main_after_payment")
 def cb_back_to_main_after_payment(c):
