@@ -33,8 +33,10 @@ STUDIO_TELEGRAM = "@majesticbudan"
 STUDIO_EMAIL = "hello@machata.studio"
 
 # Администратор (ID чата для уведомлений и админ-панели)
-# Можно установить через переменную окружения ADMIN_CHAT_ID или через команду /admin
-ADMIN_CHAT_ID = int(os.environ.get("ADMIN_CHAT_ID", "0"))  # Установите свой chat_id через переменную окружения
+# Устанавливается двумя способами:
+# 1. Через переменную окружения ADMIN_CHAT_ID на Railway/Render (постоянно)
+# 2. Через команду /setadmin в боте (временно, до перезапуска)
+ADMIN_CHAT_ID = int(os.environ.get("ADMIN_CHAT_ID", "0"))
 
 # VIP пользователи
 VIP_USERS = {
@@ -610,14 +612,16 @@ def set_admin(m):
         text = f"""✅ <b>Администратор установлен!</b>
 
 <b>Твой Chat ID:</b> <code>{chat_id}</code>
-<b>Предыдущий админ:</b> <code>{old_admin}</code>
+<b>Предыдущий админ:</b> <code>{old_admin if old_admin > 0 else 'не был установлен'}</code>
 
 ⚠️ <b>Внимание:</b> Это временная настройка!
 После перезапуска бота настройка сбросится.
 
-<b>Для постоянной настройки:</b>
-Добавь переменную окружения:
-<code>ADMIN_CHAT_ID={chat_id}</code>
+<b>Для постоянной настройки на Railway:</b>
+1. Зайди в настройки проекта на Railway
+2. Добавь переменную окружения:
+   <code>ADMIN_CHAT_ID={chat_id}</code>
+3. Перезапусти бота
 
 Отправь /start чтобы увидеть админ-панель в меню."""
         
@@ -1492,6 +1496,9 @@ def complete_booking(chat_id):
         user_states.pop(chat_id, None)
         log_info(f"Платеж создан: booking_id={booking_id}, сумма={price}₽")
         
+        # Уведомляем администратора о новом бронировании
+        notify_admin_new_booking(booking)
+        
     except Exception as e:
         log_error(f"complete_booking: {str(e)}", e)
         bot.send_message(
@@ -1501,6 +1508,80 @@ def complete_booking(chat_id):
         )
 
 # ====== УВЕДОМЛЕНИЯ ======================================================
+
+def notify_admin_new_booking(booking):
+    """Уведомление администратору о новом бронировании"""
+    if not ADMIN_CHAT_ID or ADMIN_CHAT_ID <= 0:
+        return
+    
+    try:
+        names = {
+            'repet': '🎸 Репетиция',
+            'studio': '🎧 Студия (самостоятельная)',
+            'full': '✨ Студия со звукорежем',
+        }
+        
+        date_str = booking.get('date', '')
+        times = booking.get('times', [])
+        if times:
+            start = min(times)
+            end = max(times) + 1
+            time_str = f"{start:02d}:00–{end:02d}:00 ({len(times)}ч)"
+        else:
+            time_str = "Время не указано"
+        
+        text = f"""🆕 <b>НОВОЕ БРОНИРОВАНИЕ</b>
+
+{format_admin_booking(booking)}
+
+<b>📞 Контакты клиента:</b>
+☎️ {booking.get('phone', 'N/A')}
+📧 {booking.get('email', 'N/A')}
+
+<b>⏳ Статус:</b> Ожидает оплаты
+💳 Клиенту отправлена ссылка на оплату"""
+        
+        bot.send_message(ADMIN_CHAT_ID, text, parse_mode='HTML')
+        log_info(f"Уведомление администратору о новом бронировании {booking.get('id')}")
+    except Exception as e:
+        log_error(f"Ошибка отправки уведомления администратору о новом бронировании: {str(e)}", e)
+
+def notify_admin_payment_success(booking):
+    """Уведомление администратору об успешной оплате"""
+    if not ADMIN_CHAT_ID or ADMIN_CHAT_ID <= 0:
+        return
+    
+    try:
+        names = {
+            'repet': '🎸 Репетиция',
+            'studio': '🎧 Студия (самостоятельная)',
+            'full': '✨ Студия со звукорежем',
+        }
+        
+        date_str = booking.get('date', '')
+        times = booking.get('times', [])
+        if times:
+            start = min(times)
+            end = max(times) + 1
+            time_str = f"{start:02d}:00–{end:02d}:00 ({len(times)}ч)"
+        else:
+            time_str = "Время не указано"
+        
+        text = f"""✅ <b>БРОНИРОВАНИЕ ОПЛАЧЕНО</b>
+
+{format_admin_booking(booking)}
+
+<b>📞 Контакты клиента:</b>
+☎️ {booking.get('phone', 'N/A')}
+📧 {booking.get('email', 'N/A')}
+
+<b>💰 Сумма:</b> {booking.get('price', 0)} ₽
+<b>✅ Статус:</b> Оплачено"""
+        
+        bot.send_message(ADMIN_CHAT_ID, text, parse_mode='HTML')
+        log_info(f"Уведомление администратору об оплате бронирования {booking.get('id')}")
+    except Exception as e:
+        log_error(f"Ошибка отправки уведомления администратору об оплате: {str(e)}", e)
 
 def notify_payment_success(booking):
     """Уведомление об успешной оплате"""
@@ -1527,32 +1608,40 @@ def notify_payment_success(booking):
         
         text = f"""✅ <b>ОПЛАТА ПОЛУЧЕНА!</b>   
 
-<b>🎉 Поздравляем! Твоя бронь подтверждена!</b>
+<b>🎉 Спасибо за оплату!</b>
 
-<b>🎵 {STUDIO_NAME}</b>
-{names.get(booking['service'], booking['service'])}
+Твоя бронь подтверждена и мы ждём тебя в студии!
 
+<b>📋 Детали брони:</b>
+🎵 {names.get(booking['service'], booking['service'])}
 📅 <b>Дата:</b> {df}
 ⏰ <b>Время:</b> {t_str}
 💰 <b>Сумма:</b> {booking['price']} ₽
-👤 <b>Имя:</b> {booking['name']}
-☎️ <b>Телефон:</b> {booking['phone']}
 
 ✉️ <b>Чек отправлен на email автоматически</b>
 
-<b>🎉 Спасибо за оплату!</b>
-
-<b>💡 ВАЖНАЯ ИНФОРМАЦИЯ:</b>
-
-   ⏰ <b>Приходи за 15 минут</b> до начала сессии
-   💰 <b>Отмена менее чем за 24 часа</b> — возврат 50%
-   ⚠️ <b>Опоздание более 30 минут</b> — бронь аннулируется
+<b>💡 ВАЖНО:</b>
+   ⏰ Приходи за 15 минут до начала сессии
+   💰 Отмена менее чем за 24 часа — возврат 50%
+   ⚠️ Опоздание более 30 минут — бронь аннулируется
 
 <b>🎵 Увидимся в студии!</b>
-<b>🔥 Твори с душой и создавай магию!</b>"""
+<b>🔥 Твори с душой!</b>"""
         
-        bot.send_message(chat_id, text, reply_markup=main_menu_keyboard(), parse_mode='HTML')
+        # Создаём клавиатуру с кнопками навигации
+        kb = types.InlineKeyboardMarkup(row_width=1)
+        kb.add(types.InlineKeyboardButton("📍 Как найти студию", callback_data="show_location_after_payment"))
+        kb.add(types.InlineKeyboardButton("💬 Написать администратору", url=f"https://t.me/{STUDIO_TELEGRAM.replace('@', '')}"))
+        # Форматируем телефон для звонка
+        phone_clean = STUDIO_CONTACT.replace(' ', '').replace('(', '').replace(')', '').replace('-', '').replace('+', '')
+        kb.add(types.InlineKeyboardButton("☎️ Позвонить", url=f"tel:+{phone_clean}"))
+        kb.add(types.InlineKeyboardButton("🏠 Главное меню", callback_data="back_to_main_after_payment"))
+        
+        bot.send_message(chat_id, text, reply_markup=kb, parse_mode='HTML')
         log_info(f"Уведомление об оплате отправлено: booking_id={booking.get('id')}")
+        
+        # Уведомляем администратора об успешной оплате
+        notify_admin_payment_success(booking)
         
     except Exception as e:
         log_error(f"notify_payment_success: {str(e)}", e)
@@ -1585,6 +1674,7 @@ def cb_booking_detail(c):
                     booking = bookings[i]
                     log_info(f"Статус брони {booking_id} обновлен на 'paid' после проверки")
                     notify_payment_success(booking)
+                    notify_admin_payment_success(booking)
                     break
     
     names = {
@@ -1683,6 +1773,7 @@ def cb_check_payment(c):
                     booking = bookings[i]
                     log_info(f"Статус брони {booking_id} обновлен на 'paid' после ручной проверки")
                     notify_payment_success(booking)
+                    notify_admin_payment_success(booking)
                     break
             
             bot.answer_callback_query(c.id, "✅ Оплата подтверждена!")
@@ -1739,6 +1830,38 @@ def cb_back_to_bookings(c):
     
     if kb:
         bot.edit_message_text("<b>📋 Твои сеансы:</b>\n\nТапни для деталей:", chat_id, c.message.message_id, reply_markup=kb, parse_mode='HTML')
+
+@bot.callback_query_handler(func=lambda c: c.data == "show_location_after_payment")
+def cb_show_location_after_payment(c):
+    """Показ локации после оплаты"""
+    chat_id = c.message.chat.id
+    kb = types.InlineKeyboardMarkup()
+    kb.add(types.InlineKeyboardButton("🗺️ Яндекс.Карты", url="https://maps.yandex.ru/?text=MACHATA+studio"))
+    kb.add(types.InlineKeyboardButton("🗺️ 2ГИС", url="https://2gis.ru/moscow/search/MACHATA"))
+    kb.add(types.InlineKeyboardButton("🔙 Назад", callback_data="back_to_payment_success"))
+    
+    bot.edit_message_text(
+        format_location(),
+        chat_id,
+        c.message.message_id,
+        reply_markup=kb,
+        parse_mode='HTML'
+    )
+
+@bot.callback_query_handler(func=lambda c: c.data == "back_to_main_after_payment")
+def cb_back_to_main_after_payment(c):
+    """Возврат в главное меню после оплаты"""
+    chat_id = c.message.chat.id
+    bot.send_message(chat_id, "🏠 <b>ГЛАВНОЕ МЕНЮ</b>\n\n<b>🎵 Выбери действие:</b>", reply_markup=main_menu_keyboard(chat_id), parse_mode='HTML')
+    bot.answer_callback_query(c.id, "🏠 Главное меню")
+
+@bot.callback_query_handler(func=lambda c: c.data == "back_to_payment_success")
+def cb_back_to_payment_success(c):
+    """Возврат к сообщению об успешной оплате"""
+    chat_id = c.message.chat.id
+    # Просто возвращаем в главное меню
+    bot.send_message(chat_id, "🏠 <b>ГЛАВНОЕ МЕНЮ</b>\n\n<b>🎵 Выбери действие:</b>", reply_markup=main_menu_keyboard(chat_id), parse_mode='HTML')
+    bot.answer_callback_query(c.id, "🏠 Главное меню")
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("admin_"))
 def cb_admin(c):
@@ -2023,6 +2146,7 @@ def yookassa_webhook():
                 bookings[booking_index]['yookassa_payment_id'] = payment_id
                 save_bookings(bookings)
                 notify_payment_success(bookings[booking_index])
+                notify_admin_payment_success(bookings[booking_index])
                 log_info(f"Бронь {booking_id} успешно подтверждена после оплаты")
             else:
                 log_info(f"Бронь {booking_id} уже была оплачена ранее")
@@ -2048,12 +2172,16 @@ if __name__ == "__main__":
     log_info(f"📍 Telegram: {STUDIO_TELEGRAM}")
     if ADMIN_CHAT_ID > 0:
         log_info(f"👨‍💼 Админ-панель активна (ID: {ADMIN_CHAT_ID})")
+        log_info("📋 Администратор может просматривать все бронирования")
+        log_info("🔔 Система уведомлений администратора активна")
         # Запускаем фоновый поток для уведомлений
         notification_thread = threading.Thread(target=notification_worker, daemon=True)
         notification_thread.start()
-        log_info("🔔 Система уведомлений запущена")
+        log_info("✅ Система уведомлений запущена (за 24ч и 30мин до брони)")
     else:
         log_info("⚠️ ADMIN_CHAT_ID не установлен - админ-панель недоступна")
+        log_info("💡 Используйте команду /setadmin для временной настройки")
+        log_info("💡 Или установите переменную ADMIN_CHAT_ID на Railway для постоянной настройки")
     log_info("=" * 60)
     
     if not YOOKASSA_SHOP_ID or not YOOKASSA_SECRET_KEY:
