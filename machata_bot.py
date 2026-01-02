@@ -547,20 +547,22 @@ def send_welcome(m):
 @bot.message_handler(commands=['admin'])
 def admin_command(m):
     """Команда для настройки администратора"""
-    global ADMIN_CHAT_ID
-    chat_id = m.chat.id
-    
-    # Показываем текущий chat_id
-    text = f"""👨‍💼 <b>АДМИН-ПАНЕЛЬ</b>
+    try:
+        global ADMIN_CHAT_ID
+        chat_id = m.chat.id
+        log_info(f"Команда /admin от пользователя {chat_id}")
+        
+        # Показываем текущий chat_id
+        text = f"""👨‍💼 <b>АДМИН-ПАНЕЛЬ</b>
 
 <b>Твой Chat ID:</b> <code>{chat_id}</code>
 
 <b>Текущий ADMIN_CHAT_ID:</b> <code>{ADMIN_CHAT_ID}</code>
 
 """
-    
-    if ADMIN_CHAT_ID == 0:
-        text += """⚠️ <b>Админ-панель не настроена</b>
+        
+        if ADMIN_CHAT_ID == 0:
+            text += f"""⚠️ <b>Админ-панель не настроена</b>
 
 <b>Чтобы активировать админ-панель:</b>
 
@@ -573,29 +575,38 @@ def admin_command(m):
 2️⃣ <b>Способ 2 (временный):</b>
    Напиши: <code>/setadmin</code>
    ⚠️ Это установит тебя как админа до перезапуска бота."""
-    elif ADMIN_CHAT_ID == chat_id:
-        text += f"""✅ <b>Ты администратор!</b>
+        elif ADMIN_CHAT_ID == chat_id:
+            text += f"""✅ <b>Ты администратор!</b>
 
 Админ-панель должна быть видна в главном меню.
 Если не видишь кнопку "👨‍💼 Админ-панель", отправь /start"""
-    else:
-        text += f"""❌ <b>Ты не администратор</b>
+        else:
+            text += f"""❌ <b>Ты не администратор</b>
 
 Текущий администратор: <code>{ADMIN_CHAT_ID}</code>
 Твой ID: <code>{chat_id}</code>"""
-    
-    bot.send_message(chat_id, text, parse_mode='HTML')
+        
+        bot.send_message(chat_id, text, parse_mode='HTML')
+        log_info(f"Ответ на /admin отправлен пользователю {chat_id}")
+    except Exception as e:
+        log_error(f"Ошибка в admin_command: {str(e)}", e)
+        try:
+            bot.send_message(m.chat.id, f"❌ <b>Ошибка:</b> {str(e)}", parse_mode='HTML')
+        except:
+            pass
 
 @bot.message_handler(commands=['setadmin'])
 def set_admin(m):
     """Временная установка администратора (до перезапуска)"""
-    global ADMIN_CHAT_ID
-    chat_id = m.chat.id
-    
-    old_admin = ADMIN_CHAT_ID
-    ADMIN_CHAT_ID = chat_id
-    
-    text = f"""✅ <b>Администратор установлен!</b>
+    try:
+        global ADMIN_CHAT_ID
+        chat_id = m.chat.id
+        log_info(f"Команда /setadmin от пользователя {chat_id}")
+        
+        old_admin = ADMIN_CHAT_ID
+        ADMIN_CHAT_ID = chat_id
+        
+        text = f"""✅ <b>Администратор установлен!</b>
 
 <b>Твой Chat ID:</b> <code>{chat_id}</code>
 <b>Предыдущий админ:</b> <code>{old_admin}</code>
@@ -608,13 +619,19 @@ def set_admin(m):
 <code>ADMIN_CHAT_ID={chat_id}</code>
 
 Отправь /start чтобы увидеть админ-панель в меню."""
-    
-    bot.send_message(chat_id, text, parse_mode='HTML')
-    
-    # Отправляем обновлённое меню с админ-панелью
-    bot.send_message(chat_id, "🏠 <b>ГЛАВНОЕ МЕНЮ</b>\n\n<b>🎵 Выбери действие:</b>", reply_markup=main_menu_keyboard(chat_id), parse_mode='HTML')
-    
-    log_info(f"Администратор установлен через команду: {chat_id} (было: {old_admin})")
+        
+        bot.send_message(chat_id, text, parse_mode='HTML')
+        
+        # Отправляем обновлённое меню с админ-панелью
+        bot.send_message(chat_id, "🏠 <b>ГЛАВНОЕ МЕНЮ</b>\n\n<b>🎵 Выбери действие:</b>", reply_markup=main_menu_keyboard(chat_id), parse_mode='HTML')
+        
+        log_info(f"Администратор установлен через команду: {chat_id} (было: {old_admin})")
+    except Exception as e:
+        log_error(f"Ошибка в set_admin: {str(e)}", e)
+        try:
+            bot.send_message(m.chat.id, f"❌ <b>Ошибка:</b> {str(e)}", parse_mode='HTML')
+        except:
+            pass
 
 @bot.message_handler(func=lambda m: m.text == "🏠 Главное меню")
 def to_main_menu(m):
