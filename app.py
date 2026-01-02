@@ -881,8 +881,7 @@ def yookassa_webhook():
         log_info("ЮКасса webhook получен")
                 # TODO: Обработка платежа ЮКасса
                 # После успешной оплаты обновить статус брони
-
-        return "ok", 200
+       return "ok", 200
     except Exception as e:
         log_error(f"yookassa_webhook: {str(e)}", e)
         return "error", 500
