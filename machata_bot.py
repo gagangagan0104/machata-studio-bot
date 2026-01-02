@@ -12,6 +12,7 @@ import base64
 import time
 import threading
 from flask import Flask, request
+from urllib.parse import quote_plus
 
 # ====== КОНФИГУРАЦИЯ ======================================================
 
@@ -227,7 +228,7 @@ def main_menu_keyboard(chat_id=None):
     if chat_id and is_admin(chat_id):
         kb.add(
             types.KeyboardButton("👨‍💼 Админ-панель")
-        )
+    )
     return kb
 
 def cancel_keyboard():
@@ -491,6 +492,18 @@ def format_location():
 <b>🕐 РЕЖИМ РАБОТЫ:</b>
 {STUDIO_HOURS}
 
+<b>🚇 КАК ДОБРАТЬСЯ:</b>
+
+<b>На метро:</b>
+🚇 Ближайшие станции метро
+🚌 Автобусы и маршрутки
+🚶 5-10 минут пешком
+
+<b>На машине:</b>
+🚗 Удобная парковка рядом
+📍 Загородное шоссе, 1 корпус 2
+🎯 Легко найти по навигатору
+
 <b>📞 КОНТАКТЫ:</b>
 
 ☎️ <b>Телефон:</b> {phone_display}
@@ -501,11 +514,6 @@ def format_location():
 
 ☎️ <b>Телефон:</b> {contact_alt}
 📱 <b>Telegram:</b> {telegram_alt}
-
-<b>🚗 УДОБСТВА:</b>
-   🚗 Удобная парковка
-   🚇 Близко к метро
-   🎯 Легко найти
 
 <b>🎵 Приходи творить!</b>
 <b>🔥 Мы ждём тебя!</b>"""
@@ -783,8 +791,13 @@ def location(m):
         
         # Создаём клавиатуру с кнопками
         kb = types.InlineKeyboardMarkup(row_width=1)
-        kb.add(types.InlineKeyboardButton("🗺️ Яндекс.Карты", url="https://maps.yandex.ru/?text=MACHATA+studio"))
-        kb.add(types.InlineKeyboardButton("🗺️ 2ГИС", url="https://2gis.ru/moscow/search/MACHATA"))
+        
+        # Кнопки карт и навигации
+        address_encoded = quote_plus("Москва, Загородное шоссе, 1 корпус 2")
+        kb.add(types.InlineKeyboardButton("🗺️ Яндекс.Карты - Как пройти", url=f"https://yandex.ru/maps/?text={address_encoded}"))
+        kb.add(types.InlineKeyboardButton("🗺️ Яндекс.Карты - Как проехать", url=f"https://yandex.ru/maps/?rtext=&rtt=auto&text={address_encoded}"))
+        kb.add(types.InlineKeyboardButton("🚇 Общественный транспорт", url=f"https://yandex.ru/maps/?rtext=&rtt=mt&text={address_encoded}"))
+        kb.add(types.InlineKeyboardButton("🗺️ 2ГИС - Найти на карте", url="https://2gis.ru/moscow/search/MACHATA"))
         
         # Безопасно получаем Telegram контакты
         try:
@@ -864,27 +877,55 @@ def location(m):
 @bot.message_handler(func=lambda m: m.text == "💬 Поддержка")
 def live_chat(m):
     """Поддержка"""
-    chat_id = m.chat.id
-    kb = types.InlineKeyboardMarkup(row_width=1)
-    kb.add(types.InlineKeyboardButton("💬 Telegram: @saxaffon", url=f"https://t.me/{STUDIO_TELEGRAM.replace('@', '')}"))
-    kb.add(types.InlineKeyboardButton("💬 Telegram: @majesticbudan", url=f"https://t.me/{STUDIO_TELEGRAM_ALT.replace('@', '')}"))
-    phone_clean = STUDIO_CONTACT.replace(' ', '').replace('(', '').replace(')', '').replace('-', '').replace('+', '')
-    if not phone_clean.startswith('+'):
-        phone_clean = '+' + phone_clean
-    kb.add(types.InlineKeyboardButton("☎️ Позвонить: +7 (929) 909-09-89", url=f"tel:{phone_clean}"))
-    phone_alt_clean = STUDIO_CONTACT_ALT.replace(' ', '').replace('(', '').replace(')', '').replace('-', '').replace('+', '')
-    if not phone_alt_clean.startswith('+'):
-        phone_alt_clean = '+' + phone_alt_clean
-    kb.add(types.InlineKeyboardButton("☎️ Позвонить: +7 (977) 777-78-27", url=f"tel:{phone_alt_clean}"))
-    
-    # Форматируем номер для отображения
-    phone_display = STUDIO_CONTACT
-    if len(phone_display) == 11 and phone_display.startswith('7'):
-        phone_display = f"+7 ({phone_display[1:4]}) {phone_display[4:7]}-{phone_display[7:9]}-{phone_display[9:11]}"
-    elif not phone_display.startswith('+'):
-        phone_display = '+' + phone_display
-    
-    text = f"""💬 <b>СВЯЖИСЬ С НАМИ</b>   
+    try:
+        chat_id = m.chat.id
+        log_info(f"Обработка кнопки 'Поддержка' от пользователя {chat_id}")
+        
+        kb = types.InlineKeyboardMarkup(row_width=1)
+        
+        # Безопасно получаем Telegram контакты
+        try:
+            telegram_main = STUDIO_TELEGRAM.replace('@', '') if STUDIO_TELEGRAM else 'saxaffon'
+            kb.add(types.InlineKeyboardButton("💬 Telegram: @saxaffon", url=f"https://t.me/{telegram_main}"))
+        except:
+            kb.add(types.InlineKeyboardButton("💬 Telegram: @saxaffon", url="https://t.me/saxaffon"))
+        
+        try:
+            telegram_alt = STUDIO_TELEGRAM_ALT.replace('@', '') if STUDIO_TELEGRAM_ALT else 'majesticbudan'
+            kb.add(types.InlineKeyboardButton("💬 Telegram: @majesticbudan", url=f"https://t.me/{telegram_alt}"))
+        except:
+            kb.add(types.InlineKeyboardButton("💬 Telegram: @majesticbudan", url="https://t.me/majesticbudan"))
+        
+        # Безопасно форматируем телефоны
+        try:
+            phone_clean = STUDIO_CONTACT.replace(' ', '').replace('(', '').replace(')', '').replace('-', '').replace('+', '')
+            if not phone_clean.startswith('+'):
+                phone_clean = '+' + phone_clean
+            kb.add(types.InlineKeyboardButton("☎️ Позвонить: +7 (929) 909-09-89", url=f"tel:{phone_clean}"))
+        except:
+            kb.add(types.InlineKeyboardButton("☎️ Позвонить: +7 (929) 909-09-89", url="tel:+79299090989"))
+        
+        try:
+            phone_alt_clean = STUDIO_CONTACT_ALT.replace(' ', '').replace('(', '').replace(')', '').replace('-', '').replace('+', '')
+            if not phone_alt_clean.startswith('+'):
+                phone_alt_clean = '+' + phone_alt_clean
+            kb.add(types.InlineKeyboardButton("☎️ Позвонить: +7 (977) 777-78-27", url=f"tel:{phone_alt_clean}"))
+        except:
+            kb.add(types.InlineKeyboardButton("☎️ Позвонить: +7 (977) 777-78-27", url="tel:+79777777827"))
+        
+        # Форматируем номер для отображения
+        try:
+            phone_display = STUDIO_CONTACT
+            if phone_display and len(str(phone_display)) == 11 and str(phone_display).startswith('7'):
+                phone_display = f"+7 ({phone_display[1:4]}) {phone_display[4:7]}-{phone_display[7:9]}-{phone_display[9:11]}"
+            elif phone_display and not str(phone_display).startswith('+'):
+                phone_display = '+' + str(phone_display)
+            else:
+                phone_display = "+7 (929) 909-09-89"
+        except:
+            phone_display = "+7 (929) 909-09-89"
+        
+        text = f"""💬 <b>СВЯЖИСЬ С НАМИ</b>   
 
 <b>🔥 Мы всегда на связи!</b>
 
@@ -906,9 +947,29 @@ def live_chat(m):
 
 <b>🚀 Ждём твоих вопросов!</b>
 🎵 <b>Твоя музыка — наш приоритет!</b>"""
-    
-    bot.send_message(chat_id, text, reply_markup=kb, parse_mode='HTML')
-    bot.send_message(chat_id, "🏠 <b>ГЛАВНОЕ МЕНЮ</b>\n\n<b>🎵 Выбери действие:</b>", reply_markup=main_menu_keyboard(chat_id), parse_mode='HTML')
+        
+        log_info(f"Отправка поддержки пользователю {chat_id}")
+        bot.send_message(chat_id, text, reply_markup=kb, parse_mode='HTML')
+        log_info(f"Поддержка успешно отправлена пользователю {chat_id}")
+    except Exception as e:
+        log_error(f"Ошибка в функции live_chat: {str(e)}", e)
+        import traceback
+        log_error(f"Traceback: {traceback.format_exc()}", e)
+        try:
+            # Отправляем упрощённую версию
+            simple_text = """💬 <b>СВЯЖИСЬ С НАМИ</b>
+
+<b>📞 КОНТАКТЫ:</b>
+📱 <b>Telegram:</b> @saxaffon
+📱 <b>Telegram:</b> @majesticbudan
+☎️ <b>Телефон:</b> +7 (929) 909-09-89
+☎️ <b>Телефон:</b> +7 (977) 777-78-27
+💌 <b>Email:</b> hello@machata.studio
+
+<b>🚀 Мы всегда готовы помочь!</b>"""
+            bot.send_message(m.chat.id, simple_text, parse_mode='HTML')
+        except Exception as e2:
+            log_error(f"Критическая ошибка при отправке поддержки: {str(e2)}", e2)
 
 @bot.message_handler(func=lambda m: m.text == "📋 Правила")
 def show_rules(m):
@@ -1974,23 +2035,67 @@ def cb_show_location_after_payment(c):
     chat_id = c.message.chat.id
     bot.answer_callback_query(c.id, "📍 Контакты")
     
-    # Отправляем контакты как новое сообщение (более надёжно)
-    kb = types.InlineKeyboardMarkup(row_width=1)
-    kb.add(types.InlineKeyboardButton("🗺️ Яндекс.Карты", url="https://maps.yandex.ru/?text=MACHATA+studio"))
-    kb.add(types.InlineKeyboardButton("🗺️ 2ГИС", url="https://2gis.ru/moscow/search/MACHATA"))
-    kb.add(types.InlineKeyboardButton("💬 Telegram: @saxaffon", url=f"https://t.me/{STUDIO_TELEGRAM.replace('@', '')}"))
-    kb.add(types.InlineKeyboardButton("💬 Telegram: @majesticbudan", url=f"https://t.me/{STUDIO_TELEGRAM_ALT.replace('@', '')}"))
-    phone_clean = STUDIO_CONTACT.replace(' ', '').replace('(', '').replace(')', '').replace('-', '').replace('+', '')
-    if not phone_clean.startswith('+'):
-        phone_clean = '+' + phone_clean
-    kb.add(types.InlineKeyboardButton("☎️ Позвонить: +7 (929) 909-09-89", url=f"tel:{phone_clean}"))
-    phone_alt_clean = STUDIO_CONTACT_ALT.replace(' ', '').replace('(', '').replace(')', '').replace('-', '').replace('+', '')
-    if not phone_alt_clean.startswith('+'):
-        phone_alt_clean = '+' + phone_alt_clean
-    kb.add(types.InlineKeyboardButton("☎️ Позвонить: +7 (977) 777-78-27", url=f"tel:{phone_alt_clean}"))
-    kb.add(types.InlineKeyboardButton("🏠 Главное меню", callback_data="back_to_main_after_payment"))
-    
-    bot.send_message(chat_id, format_location(), reply_markup=kb, parse_mode='HTML')
+    try:
+        # Отправляем контакты как новое сообщение (более надёжно)
+        kb = types.InlineKeyboardMarkup(row_width=1)
+        
+        # Кнопки карт и навигации
+        address_encoded = quote_plus("Москва, Загородное шоссе, 1 корпус 2")
+        kb.add(types.InlineKeyboardButton("🗺️ Яндекс.Карты - Как пройти", url=f"https://yandex.ru/maps/?text={address_encoded}"))
+        kb.add(types.InlineKeyboardButton("🗺️ Яндекс.Карты - Как проехать", url=f"https://yandex.ru/maps/?rtext=&rtt=auto&text={address_encoded}"))
+        kb.add(types.InlineKeyboardButton("🚇 Общественный транспорт", url=f"https://yandex.ru/maps/?rtext=&rtt=mt&text={address_encoded}"))
+        kb.add(types.InlineKeyboardButton("🗺️ 2ГИС - Найти на карте", url="https://2gis.ru/moscow/search/MACHATA"))
+        
+        # Безопасно получаем Telegram контакты
+        try:
+            telegram_main = STUDIO_TELEGRAM.replace('@', '') if STUDIO_TELEGRAM else 'saxaffon'
+            kb.add(types.InlineKeyboardButton("💬 Telegram: @saxaffon", url=f"https://t.me/{telegram_main}"))
+        except:
+            kb.add(types.InlineKeyboardButton("💬 Telegram: @saxaffon", url="https://t.me/saxaffon"))
+        
+        try:
+            telegram_alt = STUDIO_TELEGRAM_ALT.replace('@', '') if STUDIO_TELEGRAM_ALT else 'majesticbudan'
+            kb.add(types.InlineKeyboardButton("💬 Telegram: @majesticbudan", url=f"https://t.me/{telegram_alt}"))
+        except:
+            kb.add(types.InlineKeyboardButton("💬 Telegram: @majesticbudan", url="https://t.me/majesticbudan"))
+        
+        # Безопасно форматируем телефоны
+        try:
+            phone_clean = STUDIO_CONTACT.replace(' ', '').replace('(', '').replace(')', '').replace('-', '').replace('+', '')
+            if not phone_clean.startswith('+'):
+                phone_clean = '+' + phone_clean
+            kb.add(types.InlineKeyboardButton("☎️ Позвонить: +7 (929) 909-09-89", url=f"tel:{phone_clean}"))
+        except:
+            kb.add(types.InlineKeyboardButton("☎️ Позвонить: +7 (929) 909-09-89", url="tel:+79299090989"))
+        
+        try:
+            phone_alt_clean = STUDIO_CONTACT_ALT.replace(' ', '').replace('(', '').replace(')', '').replace('-', '').replace('+', '')
+            if not phone_alt_clean.startswith('+'):
+                phone_alt_clean = '+' + phone_alt_clean
+            kb.add(types.InlineKeyboardButton("☎️ Позвонить: +7 (977) 777-78-27", url=f"tel:{phone_alt_clean}"))
+        except:
+            kb.add(types.InlineKeyboardButton("☎️ Позвонить: +7 (977) 777-78-27", url="tel:+79777777827"))
+        
+        kb.add(types.InlineKeyboardButton("🏠 Главное меню", callback_data="back_to_main_after_payment"))
+        
+        location_text = format_location()
+        bot.send_message(chat_id, location_text, reply_markup=kb, parse_mode='HTML')
+    except Exception as e:
+        log_error(f"Ошибка в cb_show_location_after_payment: {str(e)}", e)
+        # Отправляем упрощённую версию
+        simple_text = """📍 <b>КОНТАКТЫ</b>
+
+<b>🎵 MACHATA studio</b>
+
+<b>📞 СВЯЗЬ:</b>
+☎️ <b>Телефон:</b> +7 (929) 909-09-89
+📱 <b>Telegram:</b> @saxaffon
+📱 <b>Telegram:</b> @majesticbudan
+☎️ <b>Телефон:</b> +7 (977) 777-78-27
+
+📍 <b>АДРЕС:</b>
+Москва, Загородное шоссе, 1 корпус 2"""
+        bot.send_message(chat_id, simple_text, parse_mode='HTML')
 
 @bot.callback_query_handler(func=lambda c: c.data == "back_to_main_after_payment")
 def cb_back_to_main_after_payment(c):
@@ -2287,6 +2392,8 @@ def yookassa_webhook():
                 log_info(f"Бронь {booking_id} успешно подтверждена после оплаты")
             else:
                 log_info(f"Бронь {booking_id} уже была оплачена ранее")
+            
+            return "ok", 200
         
         elif event_type == "payment.waiting_for_capture":
             log_info(f"Платеж {payment_id} ожидает подтверждения (capture)")
@@ -2380,8 +2487,8 @@ if __name__ == "__main__":
                 app.run(host="0.0.0.0", port=PORT, debug=False)
             except Exception as e:
                 log_error(f"Ошибка webhook: {str(e)}", e)
-                log_info("Переключаюсь на polling...")
-                try:
-                    bot.infinity_polling()
-                except Exception as e2:
-                    log_error(f"Ошибка polling: {str(e2)}", e2)
+            log_info("Переключаюсь на polling...")
+            try:
+                bot.infinity_polling()
+            except Exception as e2:
+                log_error(f"Ошибка polling: {str(e2)}", e2)
