@@ -1289,7 +1289,7 @@ def create_yookassa_payment(amount, description, booking_id, customer_email, cus
             "amount": {"value": f"{amount:.2f}", "currency": "RUB"},
             "confirmation": {
                 "type": "redirect",
-                "return_url": f"https://t.me/{STUDIO_TELEGRAM.replace('@', '')}"
+                "return_url": PUBLIC_URL if PUBLIC_URL else "https://t.me"  # После оплаты возврат на наш сайт
             },
             "capture": True,
             "description": description[:255] if description else "Оплата бронирования",
@@ -1630,11 +1630,7 @@ def notify_payment_success(booking):
         
         # Создаём клавиатуру с кнопками навигации
         kb = types.InlineKeyboardMarkup(row_width=1)
-        kb.add(types.InlineKeyboardButton("📍 Как найти студию", callback_data="show_location_after_payment"))
-        kb.add(types.InlineKeyboardButton("💬 Написать администратору", url=f"https://t.me/{STUDIO_TELEGRAM.replace('@', '')}"))
-        # Форматируем телефон для звонка
-        phone_clean = STUDIO_CONTACT.replace(' ', '').replace('(', '').replace(')', '').replace('-', '').replace('+', '')
-        kb.add(types.InlineKeyboardButton("☎️ Позвонить", url=f"tel:+{phone_clean}"))
+        kb.add(types.InlineKeyboardButton("📍 Контакты и как найти", callback_data="show_location_after_payment"))
         kb.add(types.InlineKeyboardButton("🏠 Главное меню", callback_data="back_to_main_after_payment"))
         
         bot.send_message(chat_id, text, reply_markup=kb, parse_mode='HTML')
@@ -1835,10 +1831,15 @@ def cb_back_to_bookings(c):
 def cb_show_location_after_payment(c):
     """Показ локации после оплаты"""
     chat_id = c.message.chat.id
-    kb = types.InlineKeyboardMarkup()
+    
+    # Добавляем кнопки для связи
+    kb = types.InlineKeyboardMarkup(row_width=1)
     kb.add(types.InlineKeyboardButton("🗺️ Яндекс.Карты", url="https://maps.yandex.ru/?text=MACHATA+studio"))
     kb.add(types.InlineKeyboardButton("🗺️ 2ГИС", url="https://2gis.ru/moscow/search/MACHATA"))
-    kb.add(types.InlineKeyboardButton("🔙 Назад", callback_data="back_to_payment_success"))
+    kb.add(types.InlineKeyboardButton("💬 Написать в Telegram", url=f"https://t.me/{STUDIO_TELEGRAM.replace('@', '')}"))
+    phone_clean = STUDIO_CONTACT.replace(' ', '').replace('(', '').replace(')', '').replace('-', '').replace('+', '')
+    kb.add(types.InlineKeyboardButton("☎️ Позвонить", url=f"tel:+{phone_clean}"))
+    kb.add(types.InlineKeyboardButton("🏠 Главное меню", callback_data="back_to_main_after_payment"))
     
     bot.edit_message_text(
         format_location(),
@@ -1855,13 +1856,6 @@ def cb_back_to_main_after_payment(c):
     bot.send_message(chat_id, "🏠 <b>ГЛАВНОЕ МЕНЮ</b>\n\n<b>🎵 Выбери действие:</b>", reply_markup=main_menu_keyboard(chat_id), parse_mode='HTML')
     bot.answer_callback_query(c.id, "🏠 Главное меню")
 
-@bot.callback_query_handler(func=lambda c: c.data == "back_to_payment_success")
-def cb_back_to_payment_success(c):
-    """Возврат к сообщению об успешной оплате"""
-    chat_id = c.message.chat.id
-    # Просто возвращаем в главное меню
-    bot.send_message(chat_id, "🏠 <b>ГЛАВНОЕ МЕНЮ</b>\n\n<b>🎵 Выбери действие:</b>", reply_markup=main_menu_keyboard(chat_id), parse_mode='HTML')
-    bot.answer_callback_query(c.id, "🏠 Главное меню")
 
 @bot.callback_query_handler(func=lambda c: c.data.startswith("admin_"))
 def cb_admin(c):
