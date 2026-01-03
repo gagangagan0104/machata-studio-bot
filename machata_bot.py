@@ -51,7 +51,7 @@ VIP_USERS = {
 # Конфигурация по умолчанию
 DEFAULT_CONFIG = {
     'prices': {
-        'repet': 700,
+        'repet': 50,
         'studio': 800,
         'full': 1500,
     },
