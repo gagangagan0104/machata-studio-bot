@@ -24,11 +24,11 @@ YOOKASSA_SECRET_KEY = os.environ.get("YOOKASSA_SECRET_KEY", "")
 STUDIO_NAME = "MACHATA studio"
 BOOKINGS_FILE = 'machata_bookings.json'
 CONFIG_FILE = 'machata_config.json'
-STUDIO_CONTACT = "+7 (977) 777-78-27"
+STUDIO_CONTACT = "+79299090989"
 STUDIO_ADDRESS = "Москва, Загородное шоссе, 1 корпус 2"
 STUDIO_HOURS = "Пн–Пт 9:00–03:00 | Сб–Вс 09:00–09:00"
 STUDIO_TELEGRAM = "@majesticbudan"
-STUDIO_EMAIL = "hello@machata.studio"
+STUDIO_EMAIL = "ip.zlatov@ya.ru"
 
 # Администраторы (укажите свои Telegram ID)
 ADMIN_IDS = [
