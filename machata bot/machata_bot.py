@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import telebot
 from telebot import types
 import json
@@ -25,17 +24,11 @@ YOOKASSA_SECRET_KEY = os.environ.get("YOOKASSA_SECRET_KEY", "")
 STUDIO_NAME = "MACHATA studio"
 BOOKINGS_FILE = 'machata_bookings.json'
 CONFIG_FILE = 'machata_config.json'
-STUDIO_CONTACT = "+79299090989"
+STUDIO_CONTACT = "+7 (977) 777-78-27"
 STUDIO_ADDRESS = "Москва, Загородное шоссе, 1 корпус 2"
 STUDIO_HOURS = "Пн–Пт 9:00–03:00 | Сб–Вс 09:00–09:00"
 STUDIO_TELEGRAM = "@majesticbudan"
-STUDIO_EMAIL = "ip.zlatov@ya.ru"
-
-# Администраторы (укажите свои Telegram ID)
-ADMIN_IDS = [
-    # Добавьте сюда свои Telegram ID (можно получить через @userinfobot)
-    # Например: 123456789,
-]
+STUDIO_EMAIL = "hello@machata.studio"
 
 # Файл для хранения VIP пользователей
 VIP_USERS_FILE = 'vip_users.json'
@@ -139,11 +132,7 @@ def cancel_booking_by_id(booking_id):
             return b
     return None
 
-# ====== АДМИН ФУНКЦИИ ====================================================
-
-def is_admin(chat_id):
-    """Проверка прав администратора"""
-    return chat_id in ADMIN_IDS
+# ====== VIP ФУНКЦИИ ======================================================
 
 def load_vip_users():
     """Загрузка VIP пользователей из файла"""
@@ -151,9 +140,9 @@ def load_vip_users():
     try:
         if os.path.exists(VIP_USERS_FILE):
             with open(VIP_USERS_FILE, 'r', encoding='utf-8') as f:
-                VIP_USERS = json.load(f)
+                data = json.load(f)
                 # Преобразуем ключи в int (JSON сохраняет их как строки)
-                VIP_USERS = {int(k): v for k, v in VIP_USERS.items()}
+                VIP_USERS = {int(k): v for k, v in data.items()}
                 log_info(f"VIP пользователи загружены: {len(VIP_USERS)}")
         else:
             VIP_USERS = {}
@@ -166,45 +155,19 @@ def save_vip_users():
     """Сохранение VIP пользователей в файл"""
     try:
         with open(VIP_USERS_FILE, 'w', encoding='utf-8') as f:
-            json.dump(VIP_USERS, f, ensure_ascii=False, indent=2)
+            # Сохраняем ключи как строки, так как JSON не поддерживает int ключи
+            json.dump({str(k): v for k, v in VIP_USERS.items()}, f, ensure_ascii=False, indent=2)
         log_info(f"VIP пользователи сохранены: {len(VIP_USERS)}")
     except Exception as e:
         log_error(f"save_vip_users: {str(e)}", e)
-
-def add_vip_user(chat_id, name, discount=None, custom_price_repet=None):
-    """Добавление VIP пользователя"""
-    vip_data = {'name': name}
-    if discount is not None:
-        vip_data['discount'] = discount
-    if custom_price_repet is not None:
-        vip_data['custom_price_repet'] = custom_price_repet
-    VIP_USERS[int(chat_id)] = vip_data
-    save_vip_users()
-    log_info(f"VIP пользователь добавлен: {chat_id} ({name})")
-
-def remove_vip_user(chat_id):
-    """Удаление VIP пользователя"""
-    if int(chat_id) in VIP_USERS:
-        name = VIP_USERS[int(chat_id)].get('name', 'Unknown')
-        del VIP_USERS[int(chat_id)]
-        save_vip_users()
-        log_info(f"VIP пользователь удален: {chat_id} ({name})")
-        return True
-    return False
-
-def get_vip_list():
-    """Получение списка VIP пользователей"""
-    return VIP_USERS
-
-# ====== VIP ФУНКЦИИ ======================================================
 
 def get_user_discount(chat_id):
     """Получение VIP скидки"""
     return VIP_USERS.get(chat_id, {}).get('discount', 0)
 
-def get_user_custom_price(chat_id, service):
-    """Получение индивидуальной цены для VIP пользователя"""
-    if service == 'repet' and chat_id in VIP_USERS:
+def get_user_custom_price_repet(chat_id):
+    """Получение индивидуальной цены на репетицию для VIP пользователя"""
+    if chat_id in VIP_USERS:
         custom_price = VIP_USERS[chat_id].get('custom_price_repet')
         if custom_price is not None:
             return custom_price
@@ -340,21 +303,35 @@ def times_keyboard(chat_id, date_str, service):
     
     if selected:
         start, end = min(selected), max(selected) + 1
-        base_price = config['prices'].get(service, 0) * len(selected)
         
-        vip_discount = get_user_discount(chat_id)
-        if vip_discount > 0:
-            price = int(base_price * (1 - vip_discount / 100))
-            discount_text = f" (VIP -{vip_discount}%)"
-        elif len(selected) >= 5:
-            price = int(base_price * 0.85)
-            discount_text = " (-15%)"
-        elif len(selected) >= 3:
-            price = int(base_price * 0.9)
-            discount_text = " (-10%)"
-        else:
+        # Проверяем индивидуальную цену для VIP на репетицию
+        custom_price_repet = get_user_custom_price_repet(chat_id) if service == 'repet' else None
+        
+        if custom_price_repet is not None:
+            # Используем индивидуальную цену для VIP
+            base_price = custom_price_repet * len(selected)
             price = base_price
-            discount_text = ""
+            discount_text = " (VIP цена)"
+        else:
+            # Обычный расчет
+            if service == 'full':
+                base_price = config['prices'].get('full', 1500)
+            else:
+                base_price = config['prices'].get(service, 700) * len(selected)
+            
+            vip_discount = get_user_discount(chat_id)
+            if vip_discount > 0:
+                price = int(base_price * (1 - vip_discount / 100))
+                discount_text = f" (VIP -{vip_discount}%)"
+            elif len(selected) >= 5:
+                price = int(base_price * 0.85)
+                discount_text = " (-15%)"
+            elif len(selected) >= 3:
+                price = int(base_price * 0.9)
+                discount_text = " (-10%)"
+            else:
+                price = base_price
+                discount_text = ""
         
         kb.row(
             types.InlineKeyboardButton("🔄 Очистить", callback_data="clear_times"),
@@ -401,103 +378,109 @@ def format_welcome(chat_id):
     vip_badge = ""
     if is_vip_user(chat_id):
         vip_name = VIP_USERS[chat_id]['name']
-        vip_discount = VIP_USERS[chat_id].get('discount', 0)
-        vip_badge = f"\n\n👑 <b>VIP СТАТУС АКТИВЕН!</b>\n\n🎁 <b>Привет, {vip_name}!</b>\n💎 Твоя персональная скидка: <b>{vip_discount}%</b> на всё!\n✨ Ты в приоритете при бронировании\n\n"
+        vip_discount = VIP_USERS[chat_id]['discount']
+        vip_badge = f"\n\n<b>👑 Привет, {vip_name}!</b>\nVIP скидка <b>{vip_discount}%</b> на все услуги! 🎁"
     
-    return f"""🎵 <b>{STUDIO_NAME}</b>
+    return f"""<b>🎵 Добро пожаловать в {STUDIO_NAME}!</b>
 
-Ты попал в место, где звук становится искусством.
-Профессиональная студия мирового уровня в самом сердце Москвы.
+✨ Профессиональная студия звукозаписи и репетиционная база в Москве
 
-<b>🎯 ЧТО МЫ ПРЕДЛАГАЕМ:</b>
+<b>🎯 Наши услуги:</b>
 
-<b>🎸 РЕПЕТИЦИЯ</b> — <b>700 ₽/час</b> ⚡
-  🎤 Идеальная акустика для твоей музыки
-  🎹 Все инструменты готовы к игре
-  ☕ Кофе, чай, уют — всё включено
-  💫 Атмосфера, где рождаются хиты
+<b>🎸 РЕПЕТИЦИЯ</b> — <b>700 ₽/час</b>
+   ✓ Обработанная акустика
+   ✓ Все инструменты в наличии
+   ✓ Кофе и чай бесплатно
+   ✓ Уютная атмосфера
 
 <b>🎧 СТУДИЯ (самостоятельно)</b> — <b>800 ₽/час</b>
-   🎚️ Премиум-оборудование 
-  🔇 Звукоизоляция класса А
-  🎛️ Полный контроль над каждым звуком
-  🎬 Твой трек будет звучать как в топ-чартах
+   ✓ Профессиональное оборудование
+   ✓ Полный контроль звука
+   ✓ Звукоизоляция премиум-класса
 
-<b>✨ СТУДИЯ СО ЗВУКОРЕЖЕМ</b> — <b>1500 ₽/час</b>
-  🎵 Запись + профессиональное микширование
-  👨‍🎤 Опытный звукорежиссёр рядом
-  🎵 Готовый трек сразу после записи
-  💎 Профессиональное качество звука
+<b>✨ СТУДИЯ СО ЗВУКОРЕЖЕМ</b> — <b>1500 ₽</b>
+   ✓ Запись + микширование
+   ✓ Профессиональный звукорежиссёр
+   ✓ Готовый трек к релизу
 
-<b>🎁 БОНУСЫ ДЛЯ ТЕБЯ:</b>
-  💚 <b>3+ часа</b> подряд → <b>-10%</b> экономии
-  💚 <b>5+ часов</b> подряд → <b>-15%</b> экономии
-  ⭐ Чем больше времени — тем больше выгода!
+<b>🎁 Скидки:</b>
+   💚 <b>3+ часа</b> → <b>-10%</b>
+   💚 <b>5+ часов</b> → <b>-15%</b>
 
-<b>⚡ Забронируй за 30 секунд — всего 2 клика!</b>
-🎵 <b>Твоя музыка ждёт тебя!</b>{vip_badge}"""
+🚀 <b>Забронируй время за 2 клика!</b>{vip_badge}"""
 
 def format_prices(chat_id):
     """Форматированные тарифы"""
     vip_info = ""
     if is_vip_user(chat_id):
-        vip_discount = VIP_USERS[chat_id].get('discount', 0)
-        vip_info = f"\n\n👑 <b>ТВОЙ VIP СТАТУС</b>\n\n💎 <b>Персональная скидка: {vip_discount}%</b> на все услуги!\n⭐ Приоритетное бронирование\n🎁 Эксклюзивные предложения\n\n"
+        vip_discount = VIP_USERS[chat_id]['discount']
+        vip_info = f"\n\n<b>👑 ТВОЯ VIP СКИДКА: {vip_discount}% на все услуги!</b>"
     
-    return f"""💰 <b>ТАРИФЫ {STUDIO_NAME}</b>     
+    return f"""<b>💰 ТАРИФЫ {STUDIO_NAME}</b>
 
-<b>🎯 ВЫБЕРИ СВОЙ ФОРМАТ:</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-<b>🎸 РЕПЕТИЦИЯ</b>
-   <b>700 ₽/час</b>
+<b>🎸 РЕПЕТИЦИЯ</b> — <b>700 ₽/час</b>
 
-  🎤 Идеальная акустика для репетиций
-  🎹 Все инструменты в наличии
-  ☕ Кофе, чай, уют — бесплатно
-  💫 Атмосфера, где рождается магия
-  🎵 Твоя музыка зазвучит по-новому
+   ✓ Профессиональная акустика
+   ✓ Все инструменты в наличии
+   ✓ Кофе/чай бесплатно
+   ✓ Уютная атмосфера
 
-<b>🎧 СТУДИЯ (САМОСТОЯТЕЛЬНО)</b>
-   <b>800 ₽/час</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  🎚️ Премиум-оборудование (Neve, SSL, API)
-  🔇 Звукоизоляция класса А
-  🎛️ Полный контроль над каждым звуком
-  🎬 Твой трек будет звучать как в топ-чартах
-  💎 Профессиональный уровень записи
+<b>🎧 СТУДИЯ (САМОСТОЯТЕЛЬНО)</b> — <b>800 ₽/час</b>
 
-<b>✨ СТУДИЯ СО ЗВУКОРЕЖЕМ</b>
-   <b>1500 ₽</b> за час
+   ✓ Премиум-оборудование
+   ✓ Звукоизоляция класса А
+   ✓ Полный контроль звука
 
-  🎵 Запись + профессиональное микширование
-  👨‍🎤 Опытный звукорежиссёр рядом
-  🎵 Готовый трек сразу после записи
-  💎 Профессиональное качество звука
-  ⭐ Твой звук будет идеальным
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-<b>🎁 СИСТЕМА СКИДОК:</b>
+<b>✨ СТУДИЯ СО ЗВУКОРЕЖЕМ</b> — <b>1500 ₽</b>
 
-💚 <b>3+ часа</b> подряд → <b>-10%</b> экономии
-💚 <b>5+ часов</b> подряд → <b>-15%</b> экономии
-💎 Постоянным клиентам — особые условия
-⭐ Чем больше времени — тем больше выгода!{vip_info}
+   ✓ Запись + микширование
+   ✓ Профессиональный звукорежиссёр
+   ✓ Готовый трек к релизу
 
-<b>⚡ Забронируй прямо сейчас — всего 2 клика!</b>
-🎵 <b>Твоя музыка ждёт тебя!</b>"""
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+<b>🎁 СКИДКИ:</b>
+
+💚 <b>3+ часа</b> подряд → <b>-10%</b>
+💚 <b>5+ часов</b> подряд → <b>-15%</b>
+💎 Постоянным клиентам — особые условия{vip_info}
+
+🚀 <b>Забронируй прямо сейчас!</b>"""
 
 def format_location():
     """Форматированная информация о локации"""
-    return f"""📍 <b>КОНТАКТЫ</b>
+    return f"""<b>📍 КАК НАС НАЙТИ</b>
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 <b>🎵 {STUDIO_NAME}</b>
 
-<b>📞 СВЯЗЬ:</b>
+📍 <b>{STUDIO_ADDRESS}</b>
 
-📱 <b>Telegram:</b> {STUDIO_TELEGRAM}
-☎️ <b>Телефон:</b> {STUDIO_CONTACT}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-<b>📍 АДРЕС:</b>
-{STUDIO_ADDRESS}"""
+<b>🕐 РЕЖИМ РАБОТЫ:</b>
+
+{STUDIO_HOURS}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+<b>📞 КОНТАКТЫ:</b>
+
+☎️ <b>{STUDIO_CONTACT}</b>
+📱 <b>{STUDIO_TELEGRAM}</b>
+💌 <b>{STUDIO_EMAIL}</b>
+
+🚗 Удобная парковка
+🚇 Близко к метро
+
+<b>Приходи творить! 🎵</b>"""
 
 # ====== ОБРАБОТЧИКИ КОМАНД ===============================================
 
@@ -639,356 +622,6 @@ def live_chat(m):
     bot.send_message(chat_id, text, reply_markup=kb, parse_mode='HTML')
     bot.send_message(chat_id, "🏠 <b>Главное меню</b>", reply_markup=main_menu_keyboard(), parse_mode='HTML')
 
-# ====== АДМИН ПАНЕЛЬ ====================================================
-
-@bot.message_handler(commands=['admin'])
-def admin_panel(m):
-    """Админ-панель"""
-    chat_id = m.chat.id
-    if not is_admin(chat_id):
-        bot.send_message(chat_id, "❌ <b>Доступ запрещен.</b>", parse_mode='HTML')
-        return
-    
-    kb = types.InlineKeyboardMarkup(row_width=1)
-    kb.add(types.InlineKeyboardButton("➕ Добавить VIP клиента", callback_data="admin_add_vip"))
-    kb.add(types.InlineKeyboardButton("➖ Удалить VIP клиента", callback_data="admin_remove_vip"))
-    kb.add(types.InlineKeyboardButton("💰 Настроить цену на репетицию", callback_data="admin_set_price"))
-    kb.add(types.InlineKeyboardButton("📋 Список VIP клиентов", callback_data="admin_list_vip"))
-    kb.add(types.InlineKeyboardButton("🏠 Главное меню", callback_data="admin_main_menu"))
-    
-    text = """<b>🔐 АДМИН ПАНЕЛЬ</b>
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-<b>Управление VIP клиентами:</b>
-
-➕ <b>Добавить VIP</b> — добавить избранного клиента
-➖ <b>Удалить VIP</b> — удалить из списка
-💰 <b>Настроить цену</b> — установить индивидуальную цену на репетицию
-📋 <b>Список VIP</b> — просмотреть всех VIP клиентов
-
-<b>Выбери действие:</b>"""
-    
-    bot.send_message(chat_id, text, reply_markup=kb, parse_mode='HTML')
-
-@bot.callback_query_handler(func=lambda c: c.data == "admin_main_menu")
-def admin_main_menu(c):
-    """Возврат в главное меню из админки"""
-    chat_id = c.message.chat.id
-    if not is_admin(chat_id):
-        bot.answer_callback_query(c.id, "❌ Доступ запрещен")
-        return
-    bot.edit_message_text("🏠 <b>Главное меню</b>", chat_id, c.message.message_id, parse_mode='HTML')
-    bot.send_message(chat_id, "🏠 <b>Главное меню</b>", reply_markup=main_menu_keyboard(), parse_mode='HTML')
-
-@bot.callback_query_handler(func=lambda c: c.data == "admin_add_vip")
-def admin_add_vip(c):
-    """Добавление VIP клиента"""
-    chat_id = c.message.chat.id
-    if not is_admin(chat_id):
-        bot.answer_callback_query(c.id, "❌ Доступ запрещен")
-        return
-    
-    user_states[chat_id] = {'admin_step': 'add_vip_user_id'}
-    bot.edit_message_text(
-        "<b>➕ ДОБАВЛЕНИЕ VIP КЛИЕНТА</b>\n\n"
-        "📝 <b>Шаг 1/3:</b> Отправь Telegram ID клиента\n\n"
-        "💡 <b>Как узнать ID?</b>\n"
-        "   • Попроси клиента написать боту @userinfobot\n"
-        "   • Или перешли сообщение от клиента боту @getidsbot\n\n"
-        "Введи ID:",
-        chat_id, c.message.message_id,
-        parse_mode='HTML'
-    )
-
-@bot.callback_query_handler(func=lambda c: c.data == "admin_remove_vip")
-def admin_remove_vip(c):
-    """Удаление VIP клиента"""
-    chat_id = c.message.chat.id
-    if not is_admin(chat_id):
-        bot.answer_callback_query(c.id, "❌ Доступ запрещен")
-        return
-    
-    vip_list = get_vip_list()
-    if not vip_list:
-        bot.answer_callback_query(c.id, "📭 Список VIP пуст")
-        return
-    
-    kb = types.InlineKeyboardMarkup()
-    for user_id, vip_data in vip_list.items():
-        name = vip_data.get('name', 'Unknown')
-        kb.add(types.InlineKeyboardButton(
-            f"❌ {name} (ID: {user_id})",
-            callback_data=f"admin_delete_vip_{user_id}"
-        ))
-    kb.add(types.InlineKeyboardButton("🔙 Назад", callback_data="admin_back"))
-    
-    bot.edit_message_text(
-        "<b>➖ УДАЛЕНИЕ VIP КЛИЕНТА</b>\n\n"
-        "Выбери клиента для удаления:",
-        chat_id, c.message.message_id,
-        reply_markup=kb,
-        parse_mode='HTML'
-    )
-
-@bot.callback_query_handler(func=lambda c: c.data.startswith("admin_delete_vip_"))
-def admin_delete_vip_confirm(c):
-    """Подтверждение удаления VIP"""
-    chat_id = c.message.chat.id
-    if not is_admin(chat_id):
-        bot.answer_callback_query(c.id, "❌ Доступ запрещен")
-        return
-    
-    user_id = int(c.data.replace("admin_delete_vip_", ""))
-    if remove_vip_user(user_id):
-        bot.answer_callback_query(c.id, "✅ VIP клиент удален")
-        # Возвращаемся в админ-панель
-        kb = types.InlineKeyboardMarkup(row_width=1)
-        kb.add(types.InlineKeyboardButton("➕ Добавить VIP клиента", callback_data="admin_add_vip"))
-        kb.add(types.InlineKeyboardButton("➖ Удалить VIP клиента", callback_data="admin_remove_vip"))
-        kb.add(types.InlineKeyboardButton("💰 Настроить цену на репетицию", callback_data="admin_set_price"))
-        kb.add(types.InlineKeyboardButton("📋 Список VIP клиентов", callback_data="admin_list_vip"))
-        kb.add(types.InlineKeyboardButton("🏠 Главное меню", callback_data="admin_main_menu"))
-        bot.edit_message_text(
-            "<b>🔐 АДМИН ПАНЕЛЬ</b>\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n<b>Управление VIP клиентами:</b>\n\n➕ <b>Добавить VIP</b> — добавить избранного клиента\n➖ <b>Удалить VIP</b> — удалить из списка\n💰 <b>Настроить цену</b> — установить индивидуальную цену на репетицию\n📋 <b>Список VIP</b> — просмотреть всех VIP клиентов\n\n<b>Выбери действие:</b>",
-            chat_id, c.message.message_id,
-            reply_markup=kb,
-            parse_mode='HTML'
-        )
-    else:
-        bot.answer_callback_query(c.id, "❌ Клиент не найден")
-
-@bot.callback_query_handler(func=lambda c: c.data == "admin_set_price")
-def admin_set_price(c):
-    """Настройка цены на репетицию"""
-    chat_id = c.message.chat.id
-    if not is_admin(chat_id):
-        bot.answer_callback_query(c.id, "❌ Доступ запрещен")
-        return
-    
-    vip_list = get_vip_list()
-    if not vip_list:
-        bot.answer_callback_query(c.id, "📭 Список VIP пуст. Сначала добавь VIP клиента.")
-        return
-    
-    kb = types.InlineKeyboardMarkup()
-    for user_id, vip_data in vip_list.items():
-        name = vip_data.get('name', 'Unknown')
-        current_price = vip_data.get('custom_price_repet', 'не установлена')
-        kb.add(types.InlineKeyboardButton(
-            f"💰 {name} (текущая: {current_price}₽/ч)",
-            callback_data=f"admin_price_vip_{user_id}"
-        ))
-    kb.add(types.InlineKeyboardButton("🔙 Назад", callback_data="admin_back"))
-    
-    bot.edit_message_text(
-        "<b>💰 НАСТРОЙКА ЦЕНЫ НА РЕПЕТИЦИЮ</b>\n\n"
-        "Выбери клиента для настройки цены:",
-        chat_id, c.message.message_id,
-        reply_markup=kb,
-        parse_mode='HTML'
-    )
-
-@bot.callback_query_handler(func=lambda c: c.data.startswith("admin_price_vip_"))
-def admin_price_vip(c):
-    """Установка цены для VIP"""
-    chat_id = c.message.chat.id
-    if not is_admin(chat_id):
-        bot.answer_callback_query(c.id, "❌ Доступ запрещен")
-        return
-    
-    user_id = int(c.data.replace("admin_price_vip_", ""))
-    vip_data = VIP_USERS.get(user_id)
-    if not vip_data:
-        bot.answer_callback_query(c.id, "❌ Клиент не найден")
-        return
-    
-    user_states[chat_id] = {'admin_step': 'set_price', 'admin_target_user': user_id}
-    current_price = vip_data.get('custom_price_repet', 'не установлена')
-    name = vip_data.get('name', 'Unknown')
-    
-    bot.edit_message_text(
-        f"<b>💰 УСТАНОВКА ЦЕНЫ НА РЕПЕТИЦИЮ</b>\n\n"
-        f"👤 <b>Клиент:</b> {name}\n"
-        f"💰 <b>Текущая цена:</b> {current_price}₽/ч\n\n"
-        f"Введи новую цену за час (только число, например: <code>500</code>)\n\n"
-        f"💡 Для удаления индивидуальной цены введи <code>0</code>",
-        chat_id, c.message.message_id,
-        parse_mode='HTML'
-    )
-
-@bot.callback_query_handler(func=lambda c: c.data == "admin_list_vip")
-def admin_list_vip(c):
-    """Список VIP клиентов"""
-    chat_id = c.message.chat.id
-    if not is_admin(chat_id):
-        bot.answer_callback_query(c.id, "❌ Доступ запрещен")
-        return
-    
-    vip_list = get_vip_list()
-    if not vip_list:
-        bot.edit_message_text(
-            "<b>📋 СПИСОК VIP КЛИЕНТОВ</b>\n\n"
-            "📭 Список пуст",
-            chat_id, c.message.message_id,
-            parse_mode='HTML'
-        )
-        return
-    
-    text = "<b>📋 СПИСОК VIP КЛИЕНТОВ</b>\n\n"
-    text += "━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-    
-    for user_id, vip_data in vip_list.items():
-        name = vip_data.get('name', 'Unknown')
-        discount = vip_data.get('discount', 0)
-        custom_price = vip_data.get('custom_price_repet')
-        
-        text += f"👤 <b>{name}</b>\n"
-        text += f"   ID: <code>{user_id}</code>\n"
-        if custom_price is not None:
-            text += f"   💰 Репетиция: <b>{custom_price}₽/ч</b> (индивидуальная цена)\n"
-        elif discount > 0:
-            text += f"   💎 Скидка: <b>{discount}%</b>\n"
-        else:
-            text += f"   ⚙️ Настройки не заданы\n"
-        text += "\n"
-    
-    kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton("🔙 Назад", callback_data="admin_back"))
-    
-    bot.edit_message_text(text, chat_id, c.message.message_id, reply_markup=kb, parse_mode='HTML')
-
-@bot.callback_query_handler(func=lambda c: c.data == "admin_back")
-def admin_back(c):
-    """Возврат в админ-панель"""
-    chat_id = c.message.chat.id
-    if not is_admin(chat_id):
-        bot.answer_callback_query(c.id, "❌ Доступ запрещен")
-        return
-    
-    kb = types.InlineKeyboardMarkup(row_width=1)
-    kb.add(types.InlineKeyboardButton("➕ Добавить VIP клиента", callback_data="admin_add_vip"))
-    kb.add(types.InlineKeyboardButton("➖ Удалить VIP клиента", callback_data="admin_remove_vip"))
-    kb.add(types.InlineKeyboardButton("💰 Настроить цену на репетицию", callback_data="admin_set_price"))
-    kb.add(types.InlineKeyboardButton("📋 Список VIP клиентов", callback_data="admin_list_vip"))
-    kb.add(types.InlineKeyboardButton("🏠 Главное меню", callback_data="admin_main_menu"))
-    
-    bot.edit_message_text(
-        "<b>🔐 АДМИН ПАНЕЛЬ</b>\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n<b>Управление VIP клиентами:</b>\n\n➕ <b>Добавить VIP</b> — добавить избранного клиента\n➖ <b>Удалить VIP</b> — удалить из списка\n💰 <b>Настроить цену</b> — установить индивидуальную цену на репетицию\n📋 <b>Список VIP</b> — просмотреть всех VIP клиентов\n\n<b>Выбери действие:</b>",
-        chat_id, c.message.message_id,
-        reply_markup=kb,
-        parse_mode='HTML'
-    )
-
-# Обработка текстовых сообщений для админ-панели
-@bot.message_handler(func=lambda m: m.chat.id in user_states and user_states[m.chat.id].get('admin_step'))
-def process_admin_input(m):
-    """Обработка ввода данных для админ-панели"""
-    chat_id = m.chat.id
-    if not is_admin(chat_id):
-        return
-    
-    state = user_states.get(chat_id, {})
-    admin_step = state.get('admin_step')
-    
-    if admin_step == 'add_vip_user_id':
-        try:
-            user_id = int(m.text.strip())
-            state['admin_step'] = 'add_vip_name'
-            state['admin_user_id'] = user_id
-            bot.send_message(
-                chat_id,
-                "<b>➕ ДОБАВЛЕНИЕ VIP КЛИЕНТА</b>\n\n"
-                "📝 <b>Шаг 2/3:</b> Введи имя клиента:",
-                parse_mode='HTML'
-            )
-        except ValueError:
-            bot.send_message(chat_id, "❌ <b>Ошибка:</b> ID должен быть числом. Попробуй снова:", parse_mode='HTML')
-    
-    elif admin_step == 'add_vip_name':
-        name = m.text.strip()
-        state['admin_step'] = 'add_vip_discount'
-        state['admin_name'] = name
-        bot.send_message(
-            chat_id,
-            "<b>➕ ДОБАВЛЕНИЕ VIP КЛИЕНТА</b>\n\n"
-            "📝 <b>Шаг 3/3:</b> Введи скидку в процентах (0-100)\n\n"
-            "💡 Если нужна только индивидуальная цена на репетицию, введи <code>0</code>",
-            parse_mode='HTML'
-        )
-    
-    elif admin_step == 'add_vip_discount':
-        try:
-            discount = int(m.text.strip())
-            if discount < 0 or discount > 100:
-                bot.send_message(chat_id, "❌ <b>Ошибка:</b> Скидка должна быть от 0 до 100. Попробуй снова:", parse_mode='HTML')
-                return
-            
-            user_id = state.get('admin_user_id')
-            name = state.get('admin_name')
-            
-            add_vip_user(user_id, name, discount=discount if discount > 0 else None)
-            
-            bot.send_message(
-                chat_id,
-                f"✅ <b>VIP клиент добавлен!</b>\n\n"
-                f"👤 <b>Имя:</b> {name}\n"
-                f"🆔 <b>ID:</b> <code>{user_id}</code>\n"
-                f"💎 <b>Скидка:</b> {discount}%\n\n"
-                f"💡 Теперь можешь настроить индивидуальную цену на репетицию через админ-панель.",
-                reply_markup=main_menu_keyboard(),
-                parse_mode='HTML'
-            )
-            user_states.pop(chat_id, None)
-        except ValueError:
-            bot.send_message(chat_id, "❌ <b>Ошибка:</b> Скидка должна быть числом. Попробуй снова:", parse_mode='HTML')
-    
-    elif admin_step == 'set_price':
-        try:
-            price = int(m.text.strip())
-            if price < 0:
-                bot.send_message(chat_id, "❌ <b>Ошибка:</b> Цена не может быть отрицательной. Попробуй снова:", parse_mode='HTML')
-                return
-            
-            target_user = state.get('admin_target_user')
-            vip_data = VIP_USERS.get(target_user)
-            
-            if not vip_data:
-                bot.send_message(chat_id, "❌ <b>Ошибка:</b> Клиент не найден.", parse_mode='HTML')
-                user_states.pop(chat_id, None)
-                return
-            
-            if price == 0:
-                # Удаляем индивидуальную цену
-                if 'custom_price_repet' in vip_data:
-                    del vip_data['custom_price_repet']
-                save_vip_users()
-                bot.send_message(
-                    chat_id,
-                    f"✅ <b>Индивидуальная цена удалена!</b>\n\n"
-                    f"👤 <b>Клиент:</b> {vip_data.get('name', 'Unknown')}\n"
-                    f"💰 Теперь используется стандартная цена.",
-                    reply_markup=main_menu_keyboard(),
-                    parse_mode='HTML'
-                )
-            else:
-                # Устанавливаем индивидуальную цену
-                add_vip_user(target_user, vip_data.get('name', 'Unknown'), 
-                           discount=vip_data.get('discount'), 
-                           custom_price_repet=price)
-                bot.send_message(
-                    chat_id,
-                    f"✅ <b>Цена установлена!</b>\n\n"
-                    f"👤 <b>Клиент:</b> {vip_data.get('name', 'Unknown')}\n"
-                    f"💰 <b>Цена на репетицию:</b> {price}₽/ч",
-                    reply_markup=main_menu_keyboard(),
-                    parse_mode='HTML'
-                )
-            
-            user_states.pop(chat_id, None)
-        except ValueError:
-            bot.send_message(chat_id, "❌ <b>Ошибка:</b> Цена должна быть числом. Попробуй снова:", parse_mode='HTML')
-
 # ====== CALLBACK ОБРАБОТЧИКИ ============================================
 
 @bot.callback_query_handler(func=lambda c: c.data == "cancel")
@@ -1010,7 +643,9 @@ def cb_service(c):
         'full': '✨ Студия со звукорежем',
     }
     
-    text = f"""🎵 <b>ШАГ 1/4: ВЫБОР ДАТЫ</b>   
+    text = f"""<b>━━━━━━━━━━━━━━━━━━━━━━━━━━━━</b>
+<b>🎵 ШАГ 1/4: ВЫБОР ДАТЫ</b>
+<b>━━━━━━━━━━━━━━━━━━━━━━━━━━━━</b>
 
 ✅ <b>{names.get(service, service)}</b> выбрана!
 
@@ -1034,7 +669,9 @@ def cb_dates_page(c):
         'full': '✨ Студия со звукорежем',
     }
     
-    text = f"""🎵 <b>ШАГ 1/4: ВЫБОР ДАТЫ</b>   
+    text = f"""<b>━━━━━━━━━━━━━━━━━━━━━━━━━━━━</b>
+<b>🎵 ШАГ 1/4: ВЫБОР ДАТЫ</b>
+<b>━━━━━━━━━━━━━━━━━━━━━━━━━━━━</b>
 
 ✅ <b>{names.get(state['service'], state['service'])}</b> выбрана!
 
@@ -1117,14 +754,18 @@ def cb_del_time(c):
     
     if sel:
         start, end = min(sel), max(sel) + 1
-        text = f"""🎵 <b>ШАГ 2/4: ВЫБОР ВРЕМЕНИ</b>   
+        text = f"""<b>━━━━━━━━━━━━━━━━━━━━━━━━━━━━</b>
+<b>🎵 ШАГ 2/4: ВЫБОР ВРЕМЕНИ</b>
+<b>━━━━━━━━━━━━━━━━━━━━━━━━━━━━</b>
 
 📅 <b>Дата:</b> {df}
 ⏰ <b>Выбрано:</b> {len(sel)} ч ({start:02d}:00 – {end:02d}:00)
 
 💚 Продолжай выбирать или нажми <b>✅ Далее</b>"""
     else:
-        text = f"""🎵 <b>ШАГ 2/4: ВЫБОР ВРЕМЕНИ</b>   
+        text = f"""<b>━━━━━━━━━━━━━━━━━━━━━━━━━━━━</b>
+<b>🎵 ШАГ 2/4: ВЫБОР ВРЕМЕНИ</b>
+<b>━━━━━━━━━━━━━━━━━━━━━━━━━━━━</b>
 
 📅 <b>Дата:</b> {df}
 
@@ -1147,7 +788,9 @@ def cb_clear_times(c):
     d = datetime.strptime(state['date'], "%Y-%m-%d")
     df = d.strftime("%d.%m.%Y")
     
-    text = f"""🎵 <b>ШАГ 2/4: ВЫБОР ВРЕМЕНИ</b>   
+    text = f"""<b>━━━━━━━━━━━━━━━━━━━━━━━━━━━━</b>
+<b>🎵 ШАГ 2/4: ВЫБОР ВРЕМЕНИ</b>
+<b>━━━━━━━━━━━━━━━━━━━━━━━━━━━━</b>
 
 📅 <b>Дата:</b> {df}
 
@@ -1235,7 +878,9 @@ def cb_confirm_times(c):
     
     state['step'] = 'name'
     
-    text = """🎵 <b>ШАГ 3/4: КОНТАКТНЫЕ ДАННЫЕ</b>   
+    text = """<b>━━━━━━━━━━━━━━━━━━━━━━━━━━━━</b>
+<b>🎵 ШАГ 3/4: КОНТАКТНЫЕ ДАННЫЕ</b>
+<b>━━━━━━━━━━━━━━━━━━━━━━━━━━━━</b>
 
 👤 <b>Как к тебе обращаться?</b>
 
@@ -1267,7 +912,9 @@ def process_name(m):
     
     bot.send_message(
         chat_id,
-        "\n📧 <b>ТВОЙ EMAIL</b>   \n\n\n✉️ <b>На него отправим чек об оплате</b>\n\n🔒 <b>Безопасность:</b>\n   • Данные защищены\n   • Используются только для чека\n   • Не передаём третьим лицам\n\n<b>Введи email ниже:</b>",
+        "📧 <b>Твой email:</b>\n\n"
+        "✉️ На него отправим чек об оплате\n"
+        "🔒 Данные защищены и используются только для чека",
         reply_markup=cancel_keyboard(),
         parse_mode='HTML'
     )
@@ -1298,7 +945,9 @@ def process_email(m):
     
     bot.send_message(
         chat_id,
-        "\n☎️ <b>ТВОЙ ТЕЛЕФОН</b>   \n\n\n📞 <b>Нужен для связи и подтверждения брони</b>\n\n💡 <b>Примеры формата:</b>\n   • <code>+7 (999) 000-00-00</code>\n   • <code>79990000000</code>\n\n🔒 <b>Безопасность:</b> Данные защищены\n\n<b>Введи номер ниже:</b>",
+        "☎️ <b>Номер телефона:</b>\n\n"
+        "📞 Нужен для связи и подтверждения брони\n\n"
+        "💡 Пример: <code>+7 (999) 000-00-00</code> или <code>79990000000</code>",
         reply_markup=cancel_keyboard(),
         parse_mode='HTML'
     )
@@ -1333,7 +982,9 @@ def process_phone(m):
     
     bot.send_message(
         chat_id,
-        "\n💬 <b>КОММЕНТАРИЙ</b>   \n\n\n🎵 <b>Что записываешь или репетируешь?</b>\n\n💡 <b>Расскажи о своём проекте:</b>\n   • Название группы/проекта\n   • Стиль музыки\n   • Особые пожелания\n\n✨ <b>Это поможет нам лучше подготовиться!</b>\n\n⏭️ <b>Или просто пропусти</b>",
+        "💬 <b>Что записываешь или репетируешь?</b>\n\n"
+        "🎵 Расскажи о своём проекте (или пропусти)\n\n"
+        "💡 Это поможет нам лучше подготовиться к сессии",
         reply_markup=kb,
         parse_mode='HTML'
     )
@@ -1453,22 +1104,25 @@ def complete_booking(chat_id):
         service = state.get('service', 'repet')
         duration = len(sel)
         
-        # Проверяем индивидуальную цену для VIP
-        custom_price = get_user_custom_price(chat_id, service)
+        # Проверяем индивидуальную цену для VIP на репетицию
+        custom_price_repet = get_user_custom_price_repet(chat_id) if service == 'repet' else None
         
-        if service == 'full':
-            base_price = config['prices'].get('full', 1500)
-        elif custom_price is not None:
-            # Используем индивидуальную цену для репетиции
-            base_price = custom_price * duration
+        if custom_price_repet is not None:
+            # Используем индивидуальную цену для VIP
+            base_price = custom_price_repet * duration
+            price = base_price
+            discount_text = " (VIP цена)"
+            log_info(f"Использована индивидуальная цена VIP для репетиции: {custom_price_repet}₽/ч × {duration}ч = {price}₽")
         else:
-            base_price = config['prices'].get(service, 700) * duration
-        
-        price = base_price
-        discount_text = ""
-        
-        # Применяем скидку только если нет индивидуальной цены
-        if custom_price is None:
+            # Обычный расчет
+            if service == 'full':
+                base_price = config['prices'].get('full', 1500)
+            else:
+                base_price = config['prices'].get(service, 700) * duration
+            
+            price = base_price
+            discount_text = ""
+            
             vip_discount = get_user_discount(chat_id)
             if vip_discount > 0:
                 price = int(base_price * (1 - vip_discount / 100))
@@ -1479,8 +1133,6 @@ def complete_booking(chat_id):
             elif duration >= 3:
                 price = int(base_price * 0.9)
                 discount_text = " (-10%)"
-        else:
-            discount_text = " (VIP цена)"
         
         if price <= 0:
             bot.send_message(chat_id, "❌ <b>Ошибка расчёта цены.</b>", parse_mode='HTML')
@@ -1622,24 +1274,29 @@ def notify_payment_success(booking):
         else:
             t_str = "-"
         
-        text = f"""✅ <b>ОПЛАТА ПОЛУЧЕНА!</b>   
+        text = f"""<b>━━━━━━━━━━━━━━━━━━━━━━━━━━━━</b>
+<b>✅ ОПЛАТА ПОЛУЧЕНА!</b>
+<b>━━━━━━━━━━━━━━━━━━━━━━━━━━━━</b>
 
-<b>🎉 Спасибо за оплату!</b>
+<b>🎵 {STUDIO_NAME}</b>
+{names.get(booking['service'], booking['service'])}
 
-Твоя бронь подтверждена и мы ждём тебя в студии!
-
-<b>📋 Детали брони:</b>
-🎵 {names.get(booking['service'], booking['service'])}
 📅 <b>Дата:</b> {df}
 ⏰ <b>Время:</b> {t_str}
 💰 <b>Сумма:</b> {booking['price']} ₽
+👤 <b>Имя:</b> {booking['name']}
+☎️ <b>Телефон:</b> {booking['phone']}
 
-✉️ <b>Чек отправлен на email автоматически</b>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-<b>💡 ВАЖНО:</b>
-  ⏰ Приходи за 15 минут до начала сессии
-  💰 Отмена менее чем за 24 часа — возврат 50%
-  ⚠️ При опоздании более 30 минут — бронь аннулируется
+✉️ <b>Чек отправлен на email</b>
+
+<b>🎉 Спасибо за оплату!</b>
+
+<b>💡 Важно:</b>
+   • Приходи за 15 минут до начала
+   • При отмене менее чем за 24 часа — возврат 50%
+   • При опоздании более 30 минут — бронь аннулируется
 
 <b>🎵 Увидимся в студии! Твори с душой!</b>"""
         
@@ -1681,26 +1338,25 @@ def cb_booking_detail(c):
     status = booking.get('status', 'pending')
     status_text = "оплачена ✅" if status == 'paid' else "ожидает оплаты ⏳"
     
-    status_map = {
-        'pending': '⏳ Ожидает оплаты',
-        'paid': '✅ Оплачено',
-        'cancelled': '❌ Отменено',
-    }
-    status_display = status_map.get(status, status)
-    
-    text = f"""📋 <b>Бронь #{booking.get('id', 'N/A')}</b>
+    text = f"""<b>━━━━━━━━━━━━━━━━━━━━━━━━━━━━</b>
+<b>📋 ДЕТАЛИ СЕАНСА</b>
+<b>━━━━━━━━━━━━━━━━━━━━━━━━━━━━</b>
 
-<b>Услуга:</b> {names.get(booking['service'], booking['service'])}
-<b>Дата:</b> {df}
-<b>Время:</b> {t_str}
-<b>Сумма:</b> {booking['price']} ₽
-<b>Статус:</b> {status_display}
+<b>{names.get(booking['service'], booking['service'])}</b>
 
-<b>Клиент:</b>
-👤 Имя: {booking['name']}
-☎️ Телефон: {booking['phone']}
-📧 Email: {booking.get('email', 'N/A')}
-💬 Комментарий: {booking.get('comment', '-')}"""
+📅 <b>Дата:</b> {df}
+⏰ <b>Время:</b> {t_str}
+💰 <b>Сумма:</b> {booking['price']} ₽
+
+📌 <b>Статус:</b> {status_text}
+
+👤 <b>Имя:</b> {booking['name']}
+☎️ <b>Телефон:</b> {booking['phone']}
+💬 <b>Комментарий:</b> {booking.get('comment', '-')}
+
+<b>━━━━━━━━━━━━━━━━━━━━━━━━━━━━</b>
+
+<b>Что сделать?</b>"""
     
     kb = types.InlineKeyboardMarkup()
     kb.add(types.InlineKeyboardButton("❌ Отменить", callback_data=f"cancel_booking_{booking_id}"))
@@ -1753,6 +1409,372 @@ def cb_back_to_bookings(c):
     
     if kb:
         bot.edit_message_text("<b>📋 Твои сеансы:</b>\n\nТапни для деталей:", chat_id, c.message.message_id, reply_markup=kb, parse_mode='HTML')
+
+# ====== АДМИН ПАНЕЛЬ ====================================================
+
+def is_admin(chat_id):
+    """Проверка прав администратора"""
+    ADMIN_CHAT_ID = int(os.environ.get("ADMIN_CHAT_ID", "0"))
+    return ADMIN_CHAT_ID > 0 and chat_id == ADMIN_CHAT_ID
+
+@bot.message_handler(commands=['admin'])
+def admin_panel_command(m):
+    """Команда /admin для доступа к админ-панели"""
+    chat_id = m.chat.id
+    if not is_admin(chat_id):
+        bot.send_message(chat_id, "❌ <b>Доступ запрещён</b>", parse_mode='HTML')
+        return
+    
+    kb = types.InlineKeyboardMarkup(row_width=1)
+    kb.add(types.InlineKeyboardButton("➕ Добавить VIP клиента", callback_data="admin_add_vip"))
+    kb.add(types.InlineKeyboardButton("➖ Удалить VIP клиента", callback_data="admin_remove_vip"))
+    kb.add(types.InlineKeyboardButton("💰 Настроить цену на репетицию", callback_data="admin_set_price_repet"))
+    kb.add(types.InlineKeyboardButton("📋 Список VIP клиентов", callback_data="admin_list_vip"))
+    
+    text = """👨‍💼 <b>АДМИН-ПАНЕЛЬ</b>
+
+<b>Управление VIP клиентами:</b>
+
+➕ <b>Добавить VIP</b> — добавить избранного клиента
+➖ <b>Удалить VIP</b> — удалить из списка
+💰 <b>Настроить цену</b> — установить индивидуальную цену на репетицию
+📋 <b>Список VIP</b> — просмотреть всех VIP клиентов
+
+<b>Выбери действие:</b>"""
+    
+    bot.send_message(chat_id, text, reply_markup=kb, parse_mode='HTML')
+
+@bot.callback_query_handler(func=lambda c: c.data == "admin_add_vip")
+def admin_add_vip_handler(c):
+    """Добавление VIP клиента"""
+    chat_id = c.message.chat.id
+    if not is_admin(chat_id):
+        bot.answer_callback_query(c.id, "❌ Доступ запрещён")
+        return
+    
+    user_states[chat_id] = {'admin_step': 'add_vip_id'}
+    bot.edit_message_text(
+        "<b>➕ ДОБАВЛЕНИЕ VIP КЛИЕНТА</b>\n\n"
+        "📝 <b>Шаг 1/3:</b> Отправь Telegram ID клиента\n\n"
+        "💡 <b>Как узнать ID?</b>\n"
+        "   • Попроси клиента написать боту @userinfobot\n"
+        "   • Или перешли сообщение от клиента боту @getidsbot\n\n"
+        "Введи ID:",
+        chat_id, c.message.message_id,
+        parse_mode='HTML'
+    )
+
+@bot.message_handler(func=lambda m: m.chat.id in user_states and user_states[m.chat.id].get('admin_step') == 'add_vip_id')
+def process_admin_add_vip_id(m):
+    """Обработка ID VIP клиента"""
+    chat_id = m.chat.id
+    if not is_admin(chat_id):
+        return
+    
+    state = user_states.get(chat_id)
+    try:
+        vip_id = int(m.text.strip())
+        state['admin_vip_id'] = vip_id
+        state['admin_step'] = 'add_vip_name'
+        bot.send_message(chat_id, "<b>➕ ДОБАВЛЕНИЕ VIP КЛИЕНТА</b>\n\n📝 <b>Шаг 2/3:</b> Введи имя клиента:", parse_mode='HTML')
+    except ValueError:
+        bot.send_message(chat_id, "❌ <b>Ошибка:</b> ID должен быть числом. Попробуй снова:", parse_mode='HTML')
+
+@bot.message_handler(func=lambda m: m.chat.id in user_states and user_states[m.chat.id].get('admin_step') == 'add_vip_name')
+def process_admin_add_vip_name(m):
+    """Обработка имени VIP клиента"""
+    chat_id = m.chat.id
+    if not is_admin(chat_id):
+        return
+    
+    state = user_states.get(chat_id)
+    state['admin_vip_name'] = m.text.strip()
+    state['admin_step'] = 'add_vip_discount'
+    bot.send_message(
+        chat_id,
+        "<b>➕ ДОБАВЛЕНИЕ VIP КЛИЕНТА</b>\n\n"
+        "📝 <b>Шаг 3/3:</b> Введи скидку в процентах (0-100)\n\n"
+        "💡 Если нужна только индивидуальная цена на репетицию, введи <code>0</code>",
+        parse_mode='HTML'
+    )
+
+@bot.message_handler(func=lambda m: m.chat.id in user_states and user_states[m.chat.id].get('admin_step') == 'add_vip_discount')
+def process_admin_add_vip_discount(m):
+    """Обработка скидки VIP клиента"""
+    chat_id = m.chat.id
+    if not is_admin(chat_id):
+        return
+    
+    state = user_states.get(chat_id)
+    try:
+        discount = int(m.text.strip())
+        if discount < 0 or discount > 100:
+            bot.send_message(chat_id, "❌ <b>Ошибка:</b> Скидка должна быть от 0 до 100. Попробуй снова:", parse_mode='HTML')
+            return
+        
+        vip_id = state.get('admin_vip_id')
+        vip_name = state.get('admin_vip_name')
+        
+        VIP_USERS[int(vip_id)] = {
+            'name': vip_name,
+            'discount': discount if discount > 0 else None
+        }
+        save_vip_users()
+        
+        bot.send_message(
+            chat_id,
+            f"✅ <b>VIP клиент добавлен!</b>\n\n"
+            f"👤 <b>Имя:</b> {vip_name}\n"
+            f"🆔 <b>ID:</b> <code>{vip_id}</code>\n"
+            f"💎 <b>Скидка:</b> {discount}%\n\n"
+            f"💡 Теперь можешь настроить индивидуальную цену на репетицию через админ-панель.",
+            reply_markup=main_menu_keyboard(),
+            parse_mode='HTML'
+        )
+        user_states.pop(chat_id, None)
+    except ValueError:
+        bot.send_message(chat_id, "❌ <b>Ошибка:</b> Скидка должна быть числом. Попробуй снова:", parse_mode='HTML')
+
+@bot.callback_query_handler(func=lambda c: c.data == "admin_remove_vip")
+def admin_remove_vip_handler(c):
+    """Удаление VIP клиента"""
+    chat_id = c.message.chat.id
+    if not is_admin(chat_id):
+        bot.answer_callback_query(c.id, "❌ Доступ запрещён")
+        return
+    
+    if not VIP_USERS:
+        bot.answer_callback_query(c.id, "📭 Список VIP пуст")
+        return
+    
+    kb = types.InlineKeyboardMarkup()
+    for user_id, vip_data in VIP_USERS.items():
+        name = vip_data.get('name', 'Unknown')
+        kb.add(types.InlineKeyboardButton(
+            f"❌ {name} (ID: {user_id})",
+            callback_data=f"admin_delete_vip_{user_id}"
+        ))
+    kb.add(types.InlineKeyboardButton("🔙 Назад", callback_data="admin_back"))
+    
+    bot.edit_message_text(
+        "<b>➖ УДАЛЕНИЕ VIP КЛИЕНТА</b>\n\n"
+        "Выбери клиента для удаления:",
+        chat_id, c.message.message_id,
+        reply_markup=kb,
+        parse_mode='HTML'
+    )
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith("admin_delete_vip_"))
+def admin_delete_vip_confirm(c):
+    """Подтверждение удаления VIP"""
+    chat_id = c.message.chat.id
+    if not is_admin(chat_id):
+        bot.answer_callback_query(c.id, "❌ Доступ запрещён")
+        return
+    
+    user_id = int(c.data.replace("admin_delete_vip_", ""))
+    if user_id in VIP_USERS:
+        name = VIP_USERS[user_id].get('name', 'Unknown')
+        del VIP_USERS[user_id]
+        save_vip_users()
+        bot.answer_callback_query(c.id, "✅ VIP клиент удален")
+        
+        # Возвращаемся в админ-панель
+        kb = types.InlineKeyboardMarkup(row_width=1)
+        kb.add(types.InlineKeyboardButton("➕ Добавить VIP клиента", callback_data="admin_add_vip"))
+        kb.add(types.InlineKeyboardButton("➖ Удалить VIP клиента", callback_data="admin_remove_vip"))
+        kb.add(types.InlineKeyboardButton("💰 Настроить цену на репетицию", callback_data="admin_set_price_repet"))
+        kb.add(types.InlineKeyboardButton("📋 Список VIP клиентов", callback_data="admin_list_vip"))
+        
+        bot.edit_message_text(
+            "<b>👨‍💼 АДМИН-ПАНЕЛЬ</b>\n\n"
+            "<b>Управление VIP клиентами:</b>\n\n"
+            "➕ <b>Добавить VIP</b> — добавить избранного клиента\n"
+            "➖ <b>Удалить VIP</b> — удалить из списка\n"
+            "💰 <b>Настроить цену</b> — установить индивидуальную цену на репетицию\n"
+            "📋 <b>Список VIP</b> — просмотреть всех VIP клиентов\n\n"
+            "<b>Выбери действие:</b>",
+            chat_id, c.message.message_id,
+            reply_markup=kb,
+            parse_mode='HTML'
+        )
+    else:
+        bot.answer_callback_query(c.id, "❌ Клиент не найден")
+
+@bot.callback_query_handler(func=lambda c: c.data == "admin_set_price_repet")
+def admin_set_price_repet_handler(c):
+    """Настройка цены на репетицию для VIP"""
+    chat_id = c.message.chat.id
+    if not is_admin(chat_id):
+        bot.answer_callback_query(c.id, "❌ Доступ запрещён")
+        return
+    
+    if not VIP_USERS:
+        bot.answer_callback_query(c.id, "📭 Список VIP пуст. Сначала добавь VIP клиента.")
+        return
+    
+    kb = types.InlineKeyboardMarkup()
+    for user_id, vip_data in VIP_USERS.items():
+        name = vip_data.get('name', 'Unknown')
+        current_price = vip_data.get('custom_price_repet', 'не установлена')
+        kb.add(types.InlineKeyboardButton(
+            f"💰 {name} (текущая: {current_price}₽/ч)",
+            callback_data=f"admin_price_vip_{user_id}"
+        ))
+    kb.add(types.InlineKeyboardButton("🔙 Назад", callback_data="admin_back"))
+    
+    bot.edit_message_text(
+        "<b>💰 НАСТРОЙКА ЦЕНЫ НА РЕПЕТИЦИЮ</b>\n\n"
+        "Выбери клиента для настройки цены:",
+        chat_id, c.message.message_id,
+        reply_markup=kb,
+        parse_mode='HTML'
+    )
+
+@bot.callback_query_handler(func=lambda c: c.data.startswith("admin_price_vip_"))
+def admin_price_vip_handler(c):
+    """Установка цены для VIP"""
+    chat_id = c.message.chat.id
+    if not is_admin(chat_id):
+        bot.answer_callback_query(c.id, "❌ Доступ запрещён")
+        return
+    
+    user_id = int(c.data.replace("admin_price_vip_", ""))
+    vip_data = VIP_USERS.get(user_id)
+    if not vip_data:
+        bot.answer_callback_query(c.id, "❌ Клиент не найден")
+        return
+    
+    user_states[chat_id] = {'admin_step': 'set_price_repet', 'admin_target_user': user_id}
+    current_price = vip_data.get('custom_price_repet', 'не установлена')
+    name = vip_data.get('name', 'Unknown')
+    
+    bot.edit_message_text(
+        f"<b>💰 УСТАНОВКА ЦЕНЫ НА РЕПЕТИЦИЮ</b>\n\n"
+        f"👤 <b>Клиент:</b> {name}\n"
+        f"💰 <b>Текущая цена:</b> {current_price}₽/ч\n\n"
+        f"Введи новую цену за час (только число, например: <code>500</code>)\n\n"
+        f"💡 Для удаления индивидуальной цены введи <code>0</code>",
+        chat_id, c.message.message_id,
+        parse_mode='HTML'
+    )
+
+@bot.message_handler(func=lambda m: m.chat.id in user_states and user_states[m.chat.id].get('admin_step') == 'set_price_repet')
+def process_admin_set_price_repet(m):
+    """Обработка установки цены на репетицию"""
+    chat_id = m.chat.id
+    if not is_admin(chat_id):
+        return
+    
+    state = user_states.get(chat_id)
+    try:
+        price = int(m.text.strip())
+        if price < 0:
+            bot.send_message(chat_id, "❌ <b>Ошибка:</b> Цена не может быть отрицательной. Попробуй снова:", parse_mode='HTML')
+            return
+        
+        target_user = state.get('admin_target_user')
+        vip_data = VIP_USERS.get(target_user)
+        
+        if not vip_data:
+            bot.send_message(chat_id, "❌ <b>Ошибка:</b> Клиент не найден.", parse_mode='HTML')
+            user_states.pop(chat_id, None)
+            return
+        
+        if price == 0:
+            # Удаляем индивидуальную цену
+            if 'custom_price_repet' in vip_data:
+                del vip_data['custom_price_repet']
+            save_vip_users()
+            bot.send_message(
+                chat_id,
+                f"✅ <b>Индивидуальная цена удалена!</b>\n\n"
+                f"👤 <b>Клиент:</b> {vip_data.get('name', 'Unknown')}\n"
+                f"💰 Теперь используется стандартная цена.",
+                reply_markup=main_menu_keyboard(),
+                parse_mode='HTML'
+            )
+        else:
+            # Устанавливаем индивидуальную цену
+            vip_data['custom_price_repet'] = price
+            save_vip_users()
+            bot.send_message(
+                chat_id,
+                f"✅ <b>Цена установлена!</b>\n\n"
+                f"👤 <b>Клиент:</b> {vip_data.get('name', 'Unknown')}\n"
+                f"💰 <b>Цена на репетицию:</b> {price}₽/ч",
+                reply_markup=main_menu_keyboard(),
+                parse_mode='HTML'
+            )
+        
+        user_states.pop(chat_id, None)
+    except ValueError:
+        bot.send_message(chat_id, "❌ <b>Ошибка:</b> Цена должна быть числом. Попробуй снова:", parse_mode='HTML')
+
+@bot.callback_query_handler(func=lambda c: c.data == "admin_list_vip")
+def admin_list_vip_handler(c):
+    """Список VIP клиентов"""
+    chat_id = c.message.chat.id
+    if not is_admin(chat_id):
+        bot.answer_callback_query(c.id, "❌ Доступ запрещён")
+        return
+    
+    if not VIP_USERS:
+        bot.edit_message_text(
+            "<b>📋 СПИСОК VIP КЛИЕНТОВ</b>\n\n"
+            "📭 Список пуст",
+            chat_id, c.message.message_id,
+            parse_mode='HTML'
+        )
+        return
+    
+    text = "<b>📋 СПИСОК VIP КЛИЕНТОВ</b>\n\n"
+    for user_id, vip_data in VIP_USERS.items():
+        name = vip_data.get('name', 'Unknown')
+        discount = vip_data.get('discount', 0)
+        custom_price = vip_data.get('custom_price_repet')
+        
+        text += f"👤 <b>{name}</b>\n"
+        text += f"   ID: <code>{user_id}</code>\n"
+        if custom_price is not None:
+            text += f"   💰 Репетиция: <b>{custom_price}₽/ч</b> (индивидуальная цена)\n"
+        elif discount and discount > 0:
+            text += f"   💎 Скидка: <b>{discount}%</b>\n"
+        else:
+            text += f"   ⚙️ Настройки не заданы\n"
+        text += "\n"
+    
+    kb = types.InlineKeyboardMarkup()
+    kb.add(types.InlineKeyboardButton("🔙 Назад", callback_data="admin_back"))
+    
+    bot.edit_message_text(text, chat_id, c.message.message_id, reply_markup=kb, parse_mode='HTML')
+
+@bot.callback_query_handler(func=lambda c: c.data == "admin_back")
+def admin_back_handler(c):
+    """Возврат в админ-панель"""
+    chat_id = c.message.chat.id
+    if not is_admin(chat_id):
+        bot.answer_callback_query(c.id, "❌ Доступ запрещён")
+        return
+    
+    kb = types.InlineKeyboardMarkup(row_width=1)
+    kb.add(types.InlineKeyboardButton("➕ Добавить VIP клиента", callback_data="admin_add_vip"))
+    kb.add(types.InlineKeyboardButton("➖ Удалить VIP клиента", callback_data="admin_remove_vip"))
+    kb.add(types.InlineKeyboardButton("💰 Настроить цену на репетицию", callback_data="admin_set_price_repet"))
+    kb.add(types.InlineKeyboardButton("📋 Список VIP клиентов", callback_data="admin_list_vip"))
+    
+    bot.edit_message_text(
+        "<b>👨‍💼 АДМИН-ПАНЕЛЬ</b>\n\n"
+        "<b>Управление VIP клиентами:</b>\n\n"
+        "➕ <b>Добавить VIP</b> — добавить избранного клиента\n"
+        "➖ <b>Удалить VIP</b> — удалить из списка\n"
+        "💰 <b>Настроить цену</b> — установить индивидуальную цену на репетицию\n"
+        "📋 <b>Список VIP</b> — просмотреть всех VIP клиентов\n\n"
+        "<b>Выбери действие:</b>",
+        chat_id, c.message.message_id,
+        reply_markup=kb,
+        parse_mode='HTML'
+    )
 
 # ====== FLASK И WEBHOOK ==================================================
 
@@ -1844,7 +1866,6 @@ if __name__ == "__main__":
     log_info(f"☎️ Контакт: {STUDIO_CONTACT}")
     log_info(f"📍 Telegram: {STUDIO_TELEGRAM}")
     log_info(f"👥 VIP клиентов: {len(VIP_USERS)}")
-    log_info(f"🔐 Админов: {len(ADMIN_IDS)}")
     log_info("=" * 60)
     
     if not YOOKASSA_SHOP_ID or not YOOKASSA_SECRET_KEY:
