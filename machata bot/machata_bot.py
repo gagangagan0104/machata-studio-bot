@@ -337,27 +337,37 @@ def times_keyboard(chat_id, date_str, service):
     
     if selected:
         start, end = min(selected), max(selected) + 1
-        # Принудительно используем правильные цены
-        if service == 'repet':
-            base_price = 700 * len(selected)  # 700 рублей за час репетиции
-        elif service == 'full':
-            base_price = config['prices'].get('full', 1500)
-        else:
-            base_price = config['prices'].get(service, 800) * len(selected)
         
-        vip_discount = get_user_discount(chat_id)
-        if vip_discount > 0:
-            price = int(base_price * (1 - vip_discount / 100))
-            discount_text = f" (VIP -{vip_discount}%)"
-        elif len(selected) >= 5:
-            price = int(base_price * 0.85)
-            discount_text = " (-15%)"
-        elif len(selected) >= 3:
-            price = int(base_price * 0.9)
-            discount_text = " (-10%)"
-        else:
+        # Проверяем индивидуальную цену для VIP на репетицию
+        custom_price_repet = get_user_custom_price_repet(chat_id) if service == 'repet' else None
+        
+        if custom_price_repet is not None:
+            # Используем индивидуальную цену для VIP
+            base_price = custom_price_repet * len(selected)
             price = base_price
-            discount_text = ""
+            discount_text = f" (VIP: {custom_price_repet}₽/ч)"
+        else:
+            # Обычный расчет
+            if service == 'repet':
+                base_price = 700 * len(selected)  # 700 рублей за час репетиции
+            elif service == 'full':
+                base_price = config['prices'].get('full', 1500)
+            else:
+                base_price = config['prices'].get(service, 800) * len(selected)
+            
+            vip_discount = get_user_discount(chat_id)
+            if vip_discount > 0:
+                price = int(base_price * (1 - vip_discount / 100))
+                discount_text = f" (VIP -{vip_discount}%)"
+            elif len(selected) >= 5:
+                price = int(base_price * 0.85)
+                discount_text = " (-15%)"
+            elif len(selected) >= 3:
+                price = int(base_price * 0.9)
+                discount_text = " (-10%)"
+            else:
+                price = base_price
+                discount_text = ""
         
         kb.row(
             types.InlineKeyboardButton("🔄 Очистить", callback_data="clear_times"),
