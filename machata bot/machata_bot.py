@@ -555,7 +555,9 @@ def format_rules():
 """
     # Фильтруем строку про суд
     for resp in responsibility:
-        if 'передано в суд' not in resp.lower() and 'суд' not in resp.lower():
+        resp_lower = resp.lower()
+        # Убираем строку "При отказе от оплаты ущерба дело может быть передано в суд"
+        if 'передано в суд' not in resp_lower and 'дело может быть передано' not in resp_lower:
             text += f"   • {resp}\n"
     
     text += f"""
