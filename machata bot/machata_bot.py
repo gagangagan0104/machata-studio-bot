@@ -2254,6 +2254,7 @@ def cb_admin(c):
             kb.add(types.InlineKeyboardButton("➖ Удалить VIP клиента", callback_data="admin_remove_vip"))
             kb.add(types.InlineKeyboardButton("💰 Настроить цену на репетицию", callback_data="admin_set_price_repet"))
             kb.add(types.InlineKeyboardButton("📝 Список VIP клиентов", callback_data="admin_list_vip"))
+            kb.add(types.InlineKeyboardButton("📱 Подсказка для клиента (ID)", callback_data="admin_vip_id_hint"))
             
             bot.edit_message_text(
                 "👨‍💼 <b>АДМИН-ПАНЕЛЬ</b>\n\n"
