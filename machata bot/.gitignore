@@ -28,6 +28,7 @@ Thumbs.db
 # Project specific
 machata_bookings.json
 machata_config.json
+vip_users.json
 *.log
 
 # Secrets (не коммитить!)
