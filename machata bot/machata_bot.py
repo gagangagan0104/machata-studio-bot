@@ -512,6 +512,20 @@ def format_rules():
     config = load_config()
     rules = config.get('rules', {})
     
+    # Словарь переводов названий ущерба на русский
+    damage_translations = {
+        'equipment_breakdown': 'Поломка оборудования',
+        'burned_furniture': 'Прожженная мебель',
+        'damaged_walls': 'Повреждённые стены',
+        'broken_instruments': 'Сломанные инструменты',
+        'other_damage': 'Прочий ущерб',
+        'equipment breakdown': 'Поломка оборудования',
+        'burned furniture': 'Прожженная мебель',
+        'damaged walls': 'Повреждённые стены',
+        'broken instruments': 'Сломанные инструменты',
+        'other damage': 'Прочий ущерб',
+    }
+    
     title = rules.get('title', '📋 ПРАВИЛА ИСПОЛЬЗОВАНИЯ СТУДИИ')
     prohibitions = rules.get('prohibitions', [])
     damage_prices = rules.get('damage_prices', {})
@@ -529,14 +543,20 @@ def format_rules():
 <b>💰 СТОИМОСТЬ УЩЕРБА:</b>
 """
     for damage_type, price in damage_prices.items():
-        damage_name = damage_type.replace('_', ' ').title()
+        # Преобразуем ключ в нижний регистр для унификации
+        damage_key = damage_type.lower().replace(' ', '_')
+        # Используем перевод, если есть
+        damage_name = damage_translations.get(damage_key, damage_translations.get(damage_type, damage_type.replace('_', ' ').title()))
+        
         text += f"   • <b>{damage_name}:</b> {price}\n"
     
     text += f"""
 <b>⚖️ ОТВЕТСТВЕННОСТЬ:</b>
 """
+    # Фильтруем строку про суд
     for resp in responsibility:
-        text += f"   • {resp}\n"
+        if 'передано в суд' not in resp.lower() and 'суд' not in resp.lower():
+            text += f"   • {resp}\n"
     
     text += f"""
 <b>📝 ОБЩИЕ ПРАВИЛА:</b>
