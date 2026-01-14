@@ -14,6 +14,9 @@ import threading
 from flask import Flask, request
 from urllib.parse import quote_plus
 
+# Импорт модуля для работы с PostgreSQL
+import database
+
 # ====== КОНФИГУРАЦИЯ ======================================================
 
 API_TOKEN = os.environ.get("API_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN")
@@ -121,6 +124,12 @@ def load_config():
 
 def load_bookings():
     """Загрузка броней"""
+    if database.is_enabled():
+        try:
+            return database.get_all_bookings()
+        except Exception as e:
+            log_error(f"load_bookings (db): {str(e)}", e)
+
     try:
         if os.path.exists(BOOKINGS_FILE):
             with open(BOOKINGS_FILE, 'r', encoding='utf-8') as f:
@@ -130,23 +139,41 @@ def load_bookings():
         log_error(f"load_bookings: {str(e)}", e)
         return []
 
+
 def save_bookings(bookings):
     """Сохранение броней"""
+    if database.is_enabled():
+        try:
+            database.save_bookings(bookings)
+            return
+        except Exception as e:
+            log_error(f"save_bookings (db): {str(e)}", e)
+
     try:
         with open(BOOKINGS_FILE, 'w', encoding='utf-8') as f:
             json.dump(bookings, f, ensure_ascii=False, indent=2)
     except Exception as e:
         log_error(f"save_bookings: {str(e)}", e)
 
+
 def add_booking(booking):
     """Добавление брони"""
+    if database.is_enabled():
+        database.add_booking(booking)
+        log_info(f"Бронь добавлена (db): ID={booking.get('id')}")
+        return
+
     bookings = load_bookings()
     bookings.append(booking)
     save_bookings(bookings)
     log_info(f"Бронь добавлена: ID={booking.get('id')}")
 
+
 def cancel_booking_by_id(booking_id):
     """Отмена брони по ID"""
+    if database.is_enabled():
+        return database.cancel_booking(booking_id)
+
     bookings = load_bookings()
     for b in bookings:
         if b.get('id') == booking_id:
@@ -158,8 +185,16 @@ def cancel_booking_by_id(booking_id):
 # ====== VIP ФУНКЦИИ ======================================================
 
 def load_vip_users():
-    """Загрузка VIP пользователей из файла"""
+    """Загрузка VIP пользователей"""
     global VIP_USERS
+    if database.is_enabled():
+        try:
+            VIP_USERS = database.get_all_vip_users()
+            log_info(f"VIP пользователи загружены (db): {len(VIP_USERS)}")
+            return
+        except Exception as e:
+            log_error(f"load_vip_users (db): {str(e)}", e)
+
     try:
         if os.path.exists(VIP_USERS_FILE):
             with open(VIP_USERS_FILE, 'r', encoding='utf-8') as f:
@@ -174,8 +209,17 @@ def load_vip_users():
         log_error(f"load_vip_users: {str(e)}", e)
         VIP_USERS = {}
 
+
 def save_vip_users():
-    """Сохранение VIP пользователей в файл"""
+    """Сохранение VIP пользователей"""
+    if database.is_enabled():
+        try:
+            database.save_vip_users(VIP_USERS)
+            log_info(f"VIP пользователи сохранены (db): {len(VIP_USERS)}")
+            return
+        except Exception as e:
+            log_error(f"save_vip_users (db): {str(e)}", e)
+
     try:
         with open(VIP_USERS_FILE, 'w', encoding='utf-8') as f:
             # Сохраняем ключи как строки, так как JSON не поддерживает int ключи
@@ -184,9 +228,11 @@ def save_vip_users():
     except Exception as e:
         log_error(f"save_vip_users: {str(e)}", e)
 
+
 def get_user_discount(chat_id):
     """Получение VIP скидки"""
     return VIP_USERS.get(chat_id, {}).get('discount', 0)
+
 
 def get_user_custom_price_repet(chat_id):
     """Получение индивидуальной цены на репетицию для VIP пользователя"""
@@ -195,6 +241,7 @@ def get_user_custom_price_repet(chat_id):
         if custom_price is not None:
             return custom_price
     return None
+
 
 def is_vip_user(chat_id):
     """Проверка VIP статуса"""
@@ -413,9 +460,15 @@ def format_welcome(chat_id):
     """Форматированное приветствие"""
     vip_badge = ""
     if is_vip_user(chat_id):
-        vip_name = VIP_USERS[chat_id]['name']
-        vip_discount = VIP_USERS[chat_id]['discount']
-        vip_badge = f"\n\n👑 <b>VIP СТАТУС АКТИВЕН!</b>\n\n🎁 <b>Привет, {vip_name}!</b>\n💎 Твоя персональная скидка: <b>{vip_discount}%</b> на всё!\n✨ Ты в приоритете при бронировании\n\n"
+        vip_user = VIP_USERS.get(chat_id, {})
+        vip_name = vip_user.get('name', '')
+        vip_discount = vip_user.get('discount', 0)
+        vip_badge = (
+            f"\n\n👑 <b>VIP СТАТУС АКТИВЕН!</b>\n\n"
+            f"🎁 <b>Привет, {vip_name}!</b>\n"
+            f"💎 Твоя персональная скидка: <b>{vip_discount}%</b> на всё!\n"
+            "✨ Ты в приоритете при бронировании\n\n"
+        )
     
     return f"""🎵 <b>{STUDIO_NAME}</b>
 
@@ -2544,12 +2597,18 @@ def yookassa_webhook():
 # ====== ТОЧКА ВХОДА ======================================================
 
 if __name__ == "__main__":
-    # Загружаем VIP пользователей при запуске
-    load_vip_users()
-    
     log_info("=" * 60)
     log_info("🎵 MACHATA studio бот запущен!")
     log_info("✨ С полной поддержкой фискализации через ЮKassa")
+
+    # Инициализация базы данных PostgreSQL (если настроена)
+    log_info("Инициализация базы данных...")
+    database.init_database()
+    log_info("База данных готова к работе!")
+
+    # Загружаем VIP пользователей при запуске
+    load_vip_users()
+
     log_info(f"☎️ Контакт: {STUDIO_CONTACT}")
     log_info(f"📍 Telegram: {STUDIO_TELEGRAM}")
     log_info(f"👥 VIP клиентов: {len(VIP_USERS)}")
