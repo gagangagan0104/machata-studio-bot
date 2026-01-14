@@ -4,7 +4,13 @@ import os
 try:
     import psycopg2
     import psycopg2.extras
-except Exception:  # pragma: no cover - optional dependency for local runs
+    _log(f"[DB] ✅ psycopg2 успешно импортирован")
+except ImportError as e:
+    _log(f"[DB] ❌ Ошибка импорта psycopg2: {e}")
+    _log(f"[DB] 💡 Проверьте, что psycopg2-binary установлен: pip install psycopg2-binary")
+    psycopg2 = None
+except Exception as e:  # pragma: no cover - optional dependency for local runs
+    _log(f"[DB] ❌ Неожиданная ошибка при импорте psycopg2: {e}")
     psycopg2 = None
 
 
