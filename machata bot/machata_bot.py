@@ -190,10 +190,11 @@ def load_vip_users():
     if database.is_enabled():
         try:
             VIP_USERS = database.get_all_vip_users()
-            log_info(f"VIP пользователи загружены (db): {len(VIP_USERS)}")
+            log_info(f"✅ VIP пользователи загружены из БД: {len(VIP_USERS)}")
             return
         except Exception as e:
-            log_error(f"load_vip_users (db): {str(e)}", e)
+            log_error(f"❌ Ошибка загрузки VIP из БД: {str(e)}", e)
+            log_info("🔄 Пробую загрузить из файла как fallback...")
 
     try:
         if os.path.exists(VIP_USERS_FILE):
@@ -215,10 +216,11 @@ def save_vip_users():
     if database.is_enabled():
         try:
             database.save_vip_users(VIP_USERS)
-            log_info(f"VIP пользователи сохранены (db): {len(VIP_USERS)}")
+            log_info(f"✅ VIP пользователи сохранены в БД: {len(VIP_USERS)}")
             return
         except Exception as e:
-            log_error(f"save_vip_users (db): {str(e)}", e)
+            log_error(f"❌ Ошибка сохранения VIP в БД: {str(e)}", e)
+            log_info("🔄 Пробую сохранить в файл как fallback...")
 
     try:
         with open(VIP_USERS_FILE, 'w', encoding='utf-8') as f:
@@ -2604,7 +2606,10 @@ if __name__ == "__main__":
     # Инициализация базы данных PostgreSQL (если настроена)
     log_info("Инициализация базы данных...")
     database.init_database()
-    log_info("База данных готова к работе!")
+    if database.is_enabled():
+        log_info("✅ База данных PostgreSQL активна!")
+    else:
+        log_info("⚠️ База данных не настроена — используются JSON файлы")
 
     # Загружаем VIP пользователей при запуске
     load_vip_users()

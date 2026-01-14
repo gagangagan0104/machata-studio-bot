@@ -17,23 +17,58 @@ def get_database_url():
     return os.environ.get("DATABASE_URL", "").strip()
 
 
+_is_enabled_cache = None
+
 def is_enabled():
-    return bool(get_database_url()) and psycopg2 is not None
+    global _is_enabled_cache
+    if _is_enabled_cache is not None:
+        return _is_enabled_cache
+    
+    db_url = get_database_url()
+    has_url = bool(db_url)
+    has_psycopg2 = psycopg2 is not None
+    result = has_url and has_psycopg2
+    _is_enabled_cache = result
+    
+    if not result:
+        _log(f"[DB] ❌ БД отключена (DATABASE_URL: {has_url}, psycopg2: {has_psycopg2})")
+    else:
+        _log(f"[DB] ✅ БД включена и будет использоваться")
+    return result
 
 
 def _get_connection():
     db_url = get_database_url()
     if not db_url or psycopg2 is None:
         return None
-    return psycopg2.connect(db_url, sslmode="require")
+    try:
+        conn = psycopg2.connect(db_url, sslmode="require")
+        _log("[DB] ✅ Подключение к БД установлено")
+        return conn
+    except Exception as e:
+        _log(f"[DB] ❌ Ошибка подключения к БД: {e}")
+        return None
 
 
 def init_database():
     """Инициализация PostgreSQL, если DATABASE_URL задан."""
+    _log("[DB] Начинаю инициализацию базы данных...")
+    db_url = get_database_url()
+    if not db_url:
+        _log("[DB] ❌ DATABASE_URL не задан — используются JSON файлы")
+        return
+    if psycopg2 is None:
+        _log("[DB] ❌ psycopg2 не установлен — используются JSON файлы")
+        _log("[DB] 💡 Установите: pip install psycopg2-binary")
+        return
+    
+    _log(f"[DB] ✅ DATABASE_URL найден (длина: {len(db_url)} символов)")
+    _log(f"[DB] ✅ psycopg2 установлен: {psycopg2.__version__ if hasattr(psycopg2, '__version__') else 'да'}")
+    
     try:
         conn = _get_connection()
         if conn is None:
-            _log("[DB] DATABASE_URL не задан или psycopg2 не установлен — пропускаю инициализацию БД.")
+            _log("[DB] ❌ Не удалось подключиться к БД — используются JSON файлы")
             return
 
         conn.autocommit = True
@@ -75,9 +110,12 @@ def init_database():
 
         cur.close()
         conn.close()
-        _log("[DB] Инициализация БД завершена.")
+        _log("[DB] ✅ Таблицы проверены/созданы успешно")
+        _log("[DB] ✅ Инициализация БД завершена")
     except Exception as e:
-        _log(f"[DB] Ошибка инициализации БД: {e}")
+        _log(f"[DB] ❌ Ошибка инициализации БД: {e}")
+        import traceback
+        _log(f"[DB] Трассировка: {traceback.format_exc()}")
 
 
 def get_all_bookings():
@@ -215,8 +253,13 @@ def get_vip_user(user_id):
 
 
 def save_vip_users(vip_users):
+    if not is_enabled():
+        _log("[DB] save_vip_users: БД не включена, пропускаю")
+        return
+    _log(f"[DB] Сохранение {len(vip_users)} VIP пользователей в БД...")
     for user_id, data in vip_users.items():
         upsert_vip_user(user_id, data)
+    _log(f"[DB] ✅ {len(vip_users)} VIP пользователей сохранено в БД")
 
 
 def upsert_vip_user(user_id, data):
