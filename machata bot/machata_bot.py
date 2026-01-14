@@ -14,6 +14,21 @@ import threading
 from flask import Flask, request
 from urllib.parse import quote_plus
 
+# Проверка и установка psycopg2-binary если нужно
+try:
+    import psycopg2
+except ImportError:
+    print("[STARTUP] ⚠️ psycopg2 не найден, пытаюсь установить...", flush=True)
+    import subprocess
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "psycopg2-binary==2.9.9", "--quiet", "--no-cache-dir"],
+                            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=60)
+        print("[STARTUP] ✅ psycopg2-binary установлен", flush=True)
+        import psycopg2
+    except Exception as e:
+        print(f"[STARTUP] ❌ Не удалось установить psycopg2-binary: {e}", flush=True)
+        print("[STARTUP] 💡 Будет использоваться файловое хранилище", flush=True)
+
 # Импорт модуля для работы с PostgreSQL
 import database
 
