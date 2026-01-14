@@ -1,20 +1,34 @@
 # -*- coding: utf-8 -*-
 import os
+import sys
+import subprocess
 
+def _log(msg):
+    # Локальный логгер, чтобы не зависеть от machata_bot.py
+    print(msg, flush=True)
+
+# Пытаемся импортировать psycopg2
 try:
     import psycopg2
     import psycopg2.extras
-    _log(f"[DB] ✅ psycopg2 успешно импортирован")
+    _log("[DB] ✅ psycopg2 успешно импортирован")
 except ImportError as e:
     _log(f"[DB] ❌ Ошибка импорта psycopg2: {e}")
-    _log(f"[DB] 💡 Проверьте, что psycopg2-binary установлен: pip install psycopg2-binary")
-    psycopg2 = None
+    _log("[DB] 💡 Попытка установить psycopg2-binary...")
+    try:
+        # Пытаемся установить psycopg2-binary если его нет
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "psycopg2-binary==2.9.9", "--quiet"], 
+                            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        import psycopg2
+        import psycopg2.extras
+        _log("[DB] ✅ psycopg2-binary успешно установлен и импортирован")
+    except Exception as install_error:
+        _log(f"[DB] ❌ Не удалось установить psycopg2-binary: {install_error}")
+        _log("[DB] 💡 Проверьте, что psycopg2-binary есть в requirements.txt")
+        psycopg2 = None
 except Exception as e:  # pragma: no cover - optional dependency for local runs
     _log(f"[DB] ❌ Неожиданная ошибка при импорте psycopg2: {e}")
     psycopg2 = None
-
-
-def _log(msg):
     # Локальный логгер, чтобы не зависеть от machata_bot.py
     print(msg, flush=True)
 
