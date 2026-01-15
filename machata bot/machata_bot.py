@@ -1396,6 +1396,16 @@ def process_admin_add_vip_discount(m):
         }
         save_vip_users()
         
+        # Перезагружаем VIP пользователей из БД для проверки сохранения
+        load_vip_users()
+        
+        # Проверяем, что VIP пользователь действительно сохранился
+        if int(vip_id) in VIP_USERS:
+            saved_user = VIP_USERS[int(vip_id)]
+            log_info(f"✅ VIP пользователь подтвержден в БД: {saved_user.get('name')} (ID: {vip_id})")
+        else:
+            log_error(f"❌ Ошибка: VIP пользователь не найден после сохранения (ID: {vip_id})")
+        
         bot.send_message(
             chat_id,
             f"✅ <b>VIP клиент добавлен!</b>\n\n"
